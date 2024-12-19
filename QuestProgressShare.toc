@@ -1,0 +1,8 @@
+## Interface: 11200
+## Title: Quest Progress Share
+## Notes: Sends a message to the party when you complete a quest.
+## Author: GraveD89
+## Version: 1.0
+## SavedVariablesPerCharacter: QuestProgressShareConfig
+
+QuestProgressShare.lua
