@@ -214,7 +214,7 @@ closeButton:SetScript("OnClick", function()
 end)
 
 -- minimap icon
-local minimapIcon = CreateFrame('Button', "minimapIcon", Minimap)
+minimapIcon = CreateFrame('Button', "QuestProgressShareMinimapIcon", Minimap)
 minimapIcon:SetClampedToScreen(true)
 minimapIcon:SetMovable(true)
 minimapIcon:EnableMouse(true)

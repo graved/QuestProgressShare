@@ -15,3 +15,13 @@ If you are playing with friends and want to share your quest progress, this AddO
     - with yourself
     - with local chat
 - Share all quest progress or only finished quests
+
+## Changelog
+
+### 1.0.1
+
+- Fixed a bug where the AddOn would not displayed in the pfUI "AddOn Button Frame"
+
+### 1.0.0
+
+- Initial release
