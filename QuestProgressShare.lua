@@ -6,6 +6,37 @@ local addonFrame = CreateFrame("FRAME", "QuestProgressShareFrame")
 -- Save the last quest progress to avoid double messages
 local lastProgress = {}
 
+-- Send Message function
+local function SendMessage(title, text, finished)
+    -- Send the message to the party chat
+    if (QuestProgressShareConfig.sendInParty and GetNumPartyMembers() > 0) then
+        if finished then
+            SendChatMessage("|cff00ff00" .. title .. " - " .. text .. "|r", "PARTY")
+        elseif not QuestProgressShareConfig.sendOnlyFinished then
+            SendChatMessage("|cffff0000" .. title .. " - " .. text .. "|r", "PARTY")
+        end
+    end
+
+    -- Send the message to the default chatframe
+    if (QuestProgressShareConfig.sendSelf) then                            
+        if finished then
+            DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. title .. " - " .. text, 0, 1, 0)
+        elseif not QuestProgressShareConfig.sendOnlyFinished then
+            DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. title .. " - " .. text, 1, 0, 0)
+        end
+    end
+
+    -- Send the message to the public chat
+    if (QuestProgressShareConfig.sendPublic) then
+        if finished then
+            SendChatMessage("|cff00ff00" .. title .. " - " .. text .. "|r", "SAY")
+        elseif not QuestProgressShareConfig.sendOnlyFinished then
+            SendChatMessage("|cffff0000" .. title .. " - " .. text .. "|r", "SAY")
+        end
+    end
+end
+
+
 -- Event-Handler function
 local function OnEvent(...)
     if event == "PLAYER_LOGIN" then
@@ -31,6 +62,11 @@ local function OnEvent(...)
         if QuestProgressShareConfig.sendOnlyFinished == nil then
             QuestProgressShareConfig.sendOnlyFinished = false
         end
+
+        if QuestProgressShareConfig.sendStartingQuests == nil then
+            QuestProgressShareConfig.sendStartingQuests = false
+        end
+
         UpdateConfigFrame()
     elseif event == "QUEST_LOG_UPDATE" and QuestProgressShareConfig.enabled then
         -- Iterate through the quest log entries
@@ -52,36 +88,12 @@ local function OnEvent(...)
                     local questKey = title .. "-" .. i
 
                     if lastProgress[questKey] == nil or lastProgress[questKey] == "" then
-                        lastProgress[questKey] = text
+                        if text ~= "" and (QuestProgressShareConfig.sendStartingQuests or string.sub(text, 1, 3) ~= " : ") then
+                            lastProgress[questKey] = text
+                        end                        
                     elseif lastProgress[questKey] ~= text then
                         lastProgress[questKey] = text
-
-                        -- Send the message to the party chat
-                        if (QuestProgressShareConfig.sendInParty and GetNumPartyMembers() > 0) then
-                            if finished then
-                                SendChatMessage("|cff00ff00" .. title .. " - " .. text .. "|r", "PARTY")
-                            elseif not QuestProgressShareConfig.sendOnlyFinished then
-                                SendChatMessage("|cffff0000" .. title .. " - " .. text .. "|r", "PARTY")
-                            end
-                        end
-
-                        -- Send the message to the default chatframe
-                        if (QuestProgressShareConfig.sendSelf) then                            
-                            if finished then
-                                DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. title .. " - " .. text, 0, 1, 0)
-                            elseif not QuestProgressShareConfig.sendOnlyFinished then
-                                DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. title .. " - " .. text, 1, 0, 0)
-                            end
-                        end
-
-                        -- Send the message to the public chat
-                        if (QuestProgressShareConfig.sendPublic) then
-                            if finished then
-                                SendChatMessage("|cff00ff00" .. title .. " - " .. text .. "|r", "SAY")
-                            elseif not QuestProgressShareConfig.sendOnlyFinished then
-                                SendChatMessage("|cffff0000" .. title .. " - " .. text .. "|r", "SAY")
-                            end
-                        end
+                        SendMessage(title, text, finished)                        
                     end
                 end
             end
@@ -98,7 +110,7 @@ addonFrame:SetScript("OnEvent", OnEvent)
 -- Create the config frame
 local configFrame = CreateFrame("Frame", "QuestProgressShareConfigFrame", UIParent)
 configFrame:SetWidth(300)
-configFrame:SetHeight(250)
+configFrame:SetHeight(270)
 configFrame:SetPoint("CENTER", 0, 0)
 configFrame:SetBackdrop({
     bgFile = "Interface/Tooltips/UI-Tooltip-Background",
@@ -189,6 +201,19 @@ local labelSendOnlyFinished = configFrame:CreateFontString("QuestProgressShareCo
 labelSendOnlyFinished:SetPoint("LEFT", checkboxSendOnlyFinished, "RIGHT", 10, 0)
 labelSendOnlyFinished:SetText("Send only finished")
 
+-- Checkbox for sending starting quests
+local checkboxSendStartingQuests = CreateFrame("CheckButton", "QuestProgressShareConfigSendStartingQuestsCheckbox", configFrame, "UICheckButtonTemplate")
+checkboxSendStartingQuests:SetPoint("TOPLEFT", 20, -190)
+checkboxSendStartingQuests:SetChecked(QuestProgressShareConfig.sendStartingQuests)
+checkboxSendStartingQuests:SetScript("OnClick", function()
+    QuestProgressShareConfig.sendStartingQuests = checkboxSendStartingQuests:GetChecked()
+end)
+
+-- Label for the "Send starting quests" checkbox
+local labelSendStartingQuests = configFrame:CreateFontString("QuestProgressShareConfigSendStartingQuestsLabel", "OVERLAY", "GameFontNormal")
+labelSendStartingQuests:SetPoint("LEFT", checkboxSendStartingQuests, "RIGHT", 10, 0)
+labelSendStartingQuests:SetText("Send starting quests")
+
 -- Update the config options when the frame is shown
 configFrame:SetScript("OnShow", function()
     UpdateConfigFrame()
@@ -200,6 +225,7 @@ function UpdateConfigFrame()
     checkboxSendSelf:SetChecked(QuestProgressShareConfig.sendSelf)
     checkboxSendPublic:SetChecked(QuestProgressShareConfig.sendPublic)
     checkboxSendOnlyFinished:SetChecked(QuestProgressShareConfig.sendOnlyFinished)
+    checkboxSendStartingQuests:SetChecked(QuestProgressShareConfig.sendStartingQuests)
 end
 
 -- Close-Button
@@ -210,7 +236,7 @@ closeButton:SetPoint("BOTTOM", 0, 20)
 closeButton:SetText("Close")
 closeButton:SetScript("OnClick", function()    
     configFrame:Hide()
-    ReloadUI()
+    -- ReloadUI()
 end)
 
 -- minimap icon
