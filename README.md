@@ -18,6 +18,11 @@ If you are playing with friends and want to share your quest progress, this AddO
 
 ## Changelog
 
+### 1.1.0
+
+- Added option to skip messages when a quest starts
+- Fixed unnecessary UI reloads
+
 ### 1.0.1
 
 - Fixed a bug where the AddOn would not displayed in the pfUI "AddOn Button Frame"
