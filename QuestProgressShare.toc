@@ -5,8 +5,11 @@
 ## Version: 1.1
 ## SavedVariablesPerCharacter: QuestProgressShareConfig
 
+libs\Chronos\Chronos.xml
+
 Main.lua
 Config.lua
+CenterMessage.lua
 ChatMessage.lua
 Core.lua
 Minimap.lua
