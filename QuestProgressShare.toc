@@ -5,4 +5,9 @@
 ## Version: 1.1
 ## SavedVariablesPerCharacter: QuestProgressShareConfig
 
-QuestProgressShare.lua
+Main.lua
+Config.lua
+ChatMessage.lua
+Core.lua
+Minimap.lua
+Commands.lua
