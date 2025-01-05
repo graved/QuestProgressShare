@@ -1,8 +1,7 @@
 local QPS = QuestProgressShare
 QPS.chatMessage = {}
 
-function QPS.chatMessage.Send(title, text, finished)
-    local message = title .. " - " .. text
+function QPS.chatMessage.Send(message, finished)    
 
     -- Send the message to the default chatframe
     if (QuestProgressShareConfig.sendSelf) then                            

@@ -35,8 +35,10 @@ local function OnEvent(...)
                         end                        
                     elseif lastProgress[questKey] ~= text then
                         lastProgress[questKey] = text
-                        
-                        QPS.chatMessage.Send(title, text, finished)                     
+
+                        local message = title .. " - " .. text                        
+                        QPS.centerMessage.ShowMessage(message, 5)
+                        QPS.chatMessage.Send(message, finished)                     
                     end
                 end
             end
