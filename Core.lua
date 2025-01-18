@@ -36,7 +36,10 @@ local function OnEvent(...)
                     elseif lastProgress[questKey] ~= text then
                         lastProgress[questKey] = text
                         
-                        QPS.chatMessage.Send(title, text, finished)                     
+                        -- Send the message
+                        if finished or not QuestProgressShareConfig.sendOnlyFinished then
+                            QPS.chatMessage.Send(title, text, finished)
+                        end                     
                     end
                 end
             end

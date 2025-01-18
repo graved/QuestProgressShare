@@ -18,6 +18,9 @@ If you are playing with friends and want to share your quest progress, this AddO
 
 ## Changelog
 
+### 1.1.1
+- Fixed incorrectly working only-send-finished-quests option while in a group
+
 ### 1.1.0
 
 - Added option to skip messages when a quest starts
