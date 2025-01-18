@@ -8,7 +8,7 @@ function QPS.chatMessage.Send(title, text, finished)
     if (QuestProgressShareConfig.sendSelf) then                            
         if finished then
             DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. message, 0, 1, 0)
-        elseif not QuestProgressShareConfig.sendOnlyFinished then
+        else
             DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. message, 1, 0, 0)
         end
     end
@@ -25,7 +25,7 @@ function QPS.chatMessage.Send(title, text, finished)
         SendChatMessage(message, "SAY")
     end
     
-    -- Send the message to the public chat
+    -- Send the message to the party chat
     if (QuestProgressShareConfig.sendInParty and GetNumPartyMembers() > 0) then
         SendChatMessage(message, "PARTY")
     end
