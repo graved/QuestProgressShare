@@ -3,7 +3,7 @@ This AddOn sends quest progress to other players.
 If you are playing with friends and want to share your quest progress, this AddOn is for you.
 
 ## Installation
-1. Download the latest version from the [releases page](https://github.com/graved/QuestProgressShare/releases)
+1. Download the latest version from the [releases page](https://github.com/Dreambjorn/QuestProgressShare/releases)
 2. Extract the archive and copy the `QuestProgressShare` folder to your `Interface/AddOns` folder
 
 ## Usage
