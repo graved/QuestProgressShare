@@ -3,6 +3,7 @@
 ## Notes: Sends a message to the party when you complete a quest.
 ## Author: GraveD89
 ## Version: 1.1.1
+## SavedVariablesPerCharacter: QPS_SavedKnownQuests
 ## SavedVariablesPerCharacter: QuestProgressShareConfig
 
 Main.lua
