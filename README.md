@@ -18,6 +18,11 @@ If you are playing with friends and want to share your quest progress, this AddO
 
 ## Changelog
 
+### 1.1.2
+- Show "Quest accepted" and "Quest completed" in chat instead of progress updates
+- Add a startup delay on player login to prevent game freeze in situations where the quest log has 15 or more quests
+- Fix "Quest completed" not showing for turn-in only quests
+
 ### 1.1.1
 - Fixed incorrectly working only-send-finished-quests option while in a group
 
