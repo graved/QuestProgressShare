@@ -16,6 +16,9 @@ If you are playing with friends and want to share your quest progress, this AddO
     - with local chat
 - Share all quest progress or only finished quests
 
+## Note
+When the first quest update occurs after installing the addon, all current quests will be sent to chat and stored in the Saved Character Variable. This is a one-time occurence and should not happen again.
+
 ## Changelog
 
 ### 1.1.2
