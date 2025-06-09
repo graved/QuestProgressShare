@@ -12,7 +12,7 @@ If you are playing with friends and want to share your quest progress, this AddO
 ### II. Automatic Installation
 
 1. Go to the Addons tab in the Turtle WoW Launcher
-2. Use the "Add new addon" button and enter the repository link to install the addon
+2. Use the "Add new addon" button and enter the [repository link](https://github.com/Dreambjorn/QuestProgressShare.git) to install the addon
 
 ## Usage
 - `/qps` to open the settings window
