@@ -4,12 +4,12 @@ If you are playing with friends and want to share your quest progress, this AddO
 
 ## Installation
 
-## I. Manual Installation
+### I. Manual Installation
 
 1. Download the latest version from the [releases page](https://github.com/Dreambjorn/QuestProgressShare/releases)
 2. Extract the archive and copy the `QuestProgressShare` folder to your `Interface/AddOns` folder
 
-## II. Automatic Installation
+### II. Automatic Installation
 
 1. Go to the Addons tab in the Turtle WoW Launcher
 2. Use the "Add new addon" button and enter the repository link to install the addon
