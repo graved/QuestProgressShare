@@ -7,9 +7,17 @@ local lastProgress = {}
 -- In your QuestProgressShare.toc, add: QPS_SavedKnownQuests = {}
 
 -- Event-Handler function
-local function OnEvent()
-    if event == "PLAYER_LOGIN" then
-        if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage("QuestProgressShare loaded") end
+local completedQuestTitle = nil
+
+function OnEvent()
+    if event == "QUEST_COMPLETE" then
+        -- The quest turn-in window is open, get the quest title
+        if GetTitleText then
+            completedQuestTitle = GetTitleText()
+        end
+        return
+    elseif event == "PLAYER_LOGIN" then
+        if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage("|cffb48affQuestProgressShare|r loaded.") end
         if not QPS_SavedKnownQuests then QPS_SavedKnownQuests = {} end
         -- Always assign a new table for per-character variable to avoid reference issues
         QPS.knownQuests = {}
@@ -53,10 +61,14 @@ local function OnEvent()
         -- After processing all current quests, check for removed quests that were complete
         for prevTitle in pairs(QPS.knownQuests or {}) do
             if not currentQuests[prevTitle] then
-                local questKey = prevTitle .. "-COMPLETE"
-                if lastProgress[questKey] ~= "Quest completed" then
-                    lastProgress[questKey] = "Quest completed"
-                    QPS.chatMessage.Send(prevTitle, "Quest completed", true)
+                -- Only send 'Quest completed' if this quest was just completed (not abandoned)
+                if completedQuestTitle == prevTitle then
+                    local questKey = prevTitle .. "-COMPLETE"
+                    if lastProgress[questKey] ~= "Quest completed" then
+                        lastProgress[questKey] = "Quest completed"
+                        QPS.chatMessage.Send(prevTitle, "Quest completed", true)
+                    end
+                    completedQuestTitle = nil
                 end
             end
         end
@@ -103,10 +115,13 @@ local function OnEvent()
                         if (lastProgress[questKey] == nil or lastProgress[questKey] == "") then
                             if not isMeaningless and (QuestProgressShareConfig.sendStartingQuests or (type(text) == "string" and string.sub(text, 1, 3) ~= " : ")) then
                                 lastProgress[questKey] = text
-                            end                        
+                                if (finished or not QuestProgressShareConfig.sendOnlyFinished) and (not completedQuestTitle or completedQuestTitle ~= title) then
+                                    QPS.chatMessage.Send(title, text, finished)
+                                end
+                            end
                         elseif lastProgress[questKey] ~= text then
                             lastProgress[questKey] = text
-                            if not isMeaningless and (finished or not QuestProgressShareConfig.sendOnlyFinished) then
+                            if not isMeaningless and (finished or not QuestProgressShareConfig.sendOnlyFinished) and (not completedQuestTitle or completedQuestTitle ~= title) then
                                 QPS.chatMessage.Send(title, text, finished)
                             end
                         end
@@ -131,4 +146,5 @@ QPS:RegisterEvent("QUEST_LOG_UPDATE")
 QPS:RegisterEvent("PLAYER_LOGIN")
 QPS:RegisterEvent("ADDON_LOADED")
 QPS:RegisterEvent("PLAYER_ENTERING_WORLD")
+QPS:RegisterEvent("QUEST_COMPLETE")
 QPS:SetScript("OnEvent", OnEvent)
