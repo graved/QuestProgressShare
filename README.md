@@ -3,8 +3,16 @@ This AddOn sends quest progress to other players.
 If you are playing with friends and want to share your quest progress, this AddOn is for you.
 
 ## Installation
-1. Download the latest version from the [releases page](https://github.com/graved/QuestProgressShare/releases)
+
+### I. Manual Installation
+
+1. Download the latest version from the [releases page](https://github.com/Dreambjorn/QuestProgressShare/releases)
 2. Extract the archive and copy the `QuestProgressShare` folder to your `Interface/AddOns` folder
+
+### II. Automatic Installation
+
+1. Go to the Addons tab in the Turtle WoW Launcher
+2. Use the "Add new addon" button and enter the [repository link](https://github.com/Dreambjorn/QuestProgressShare.git) to install the addon
 
 ## Usage
 - `/qps` to open the settings window
@@ -16,7 +24,16 @@ If you are playing with friends and want to share your quest progress, this AddO
     - with local chat
 - Share all quest progress or only finished quests
 
+## Note
+When the first quest update occurs after installing the addon, all current quests will be sent to chat and stored in the Saved Character Variable. This is a one-time occurence and should not happen again.
+
 ## Changelog
+
+### 1.1.2
+- Show "Quest accepted" and "Quest completed" in chat instead of progress updates
+- Add a startup delay on player login to prevent game freeze in situations where the quest log has 15 or more quests
+- Fix "Quest completed" not showing for turn-in only quests
+- Store current quests in a Saved Character Variable (it only applies to self)
 
 ### 1.1.1
 - Fixed incorrectly working only-send-finished-quests option while in a group
