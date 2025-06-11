@@ -29,6 +29,9 @@ When the first quest update occurs after installing the addon, all current quest
 
 ## Changelog
 
+### 1.1.3
+- Don't show "Quest completed" message when quest is abandoned
+
 ### 1.1.2
 - Show "Quest accepted" and "Quest completed" in chat instead of progress updates
 - Add a startup delay on player login to prevent game freeze in situations where the quest log has 15 or more quests
