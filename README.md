@@ -29,6 +29,9 @@ When the first quest update occurs after installing the addon, all current quest
 
 ## Changelog
 
+### 1.1.6
+- Suppress quest progress messages on reload after collapsing quest headers
+
 ### 1.1.5
 - Prevent "Quest accepted" message from showing when expanding quest categories
 
