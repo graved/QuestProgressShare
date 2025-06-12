@@ -1,3 +1,5 @@
 QuestProgressShare = CreateFrame('Frame', 'QuestProgressShare', UIParent)
 
-QuestProgressShareConfig = {}
+if not QuestProgressShareConfig then
+    QuestProgressShareConfig = {}
+end

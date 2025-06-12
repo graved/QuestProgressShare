@@ -2,29 +2,24 @@ local QPS = QuestProgressShare
 QPS.config = {}
 
 function QPS.config.SetDefaultConfigValues()
-    -- Set default values for the config options
+    -- Always assign all config keys, so they are always present in the SavedVariables file
     if QuestProgressShareConfig.enabled == nil then
-        QuestProgressShareConfig.enabled = true
+        QuestProgressShareConfig.enabled = 1
     end
-
     if QuestProgressShareConfig.sendInParty == nil then
-        QuestProgressShareConfig.sendInParty = true
+        QuestProgressShareConfig.sendInParty = 1 -- Default to enabled for new installs
     end
-
     if QuestProgressShareConfig.sendSelf == nil then
-        QuestProgressShareConfig.sendSelf = false
+        QuestProgressShareConfig.sendSelf = 0
     end
-
     if QuestProgressShareConfig.sendPublic == nil then
-        QuestProgressShareConfig.sendPublic = false
+        QuestProgressShareConfig.sendPublic = 0
     end
-
     if QuestProgressShareConfig.sendOnlyFinished == nil then
-        QuestProgressShareConfig.sendOnlyFinished = false
+        QuestProgressShareConfig.sendOnlyFinished = 0
     end
-
     if QuestProgressShareConfig.sendStartingQuests == nil then
-        QuestProgressShareConfig.sendStartingQuests = false
+        QuestProgressShareConfig.sendStartingQuests = 0
     end
 end
 
@@ -60,9 +55,9 @@ configTitle:SetText("Quest Progress Share - Settings")
 -- Checkbox for enabling/disabling the addon
 local checkboxAddonEnabled = CreateFrame("CheckButton", "QuestProgressShareConfigAddonEnabledCheckbox", QPS.configFrame, "UICheckButtonTemplate")
 checkboxAddonEnabled:SetPoint("TOPLEFT", 20, -40)
-checkboxAddonEnabled:SetChecked(QuestProgressShareConfig.enabled)
+checkboxAddonEnabled:SetChecked(QuestProgressShareConfig.enabled == 1)
 checkboxAddonEnabled:SetScript("OnClick", function()
-    QuestProgressShareConfig.enabled = checkboxAddonEnabled:GetChecked()
+    QuestProgressShareConfig.enabled = checkboxAddonEnabled:GetChecked() and 1 or 0
 end)
 
 -- Label for the "Enabled" checkbox
@@ -73,9 +68,9 @@ labelAddonEnabled:SetText("Enabled")
 -- Checkbox for sending the messages in party chat
 local checkboxSendInParty = CreateFrame("CheckButton", "QuestProgressShareConfigSendInPartyCheckbox", QPS.configFrame, "UICheckButtonTemplate")
 checkboxSendInParty:SetPoint("TOPLEFT", 20, -70)
-checkboxSendInParty:SetChecked(QuestProgressShareConfig.sendInParty)
+checkboxSendInParty:SetChecked(QuestProgressShareConfig.sendInParty == 1)
 checkboxSendInParty:SetScript("OnClick", function()
-    QuestProgressShareConfig.sendInParty = checkboxSendInParty:GetChecked()
+    QuestProgressShareConfig.sendInParty = checkboxSendInParty:GetChecked() and 1 or 0
 end)
 
 -- Label for the "Send in Party" checkbox
@@ -86,9 +81,9 @@ labelSendInParty:SetText("Send in Party")
 -- Checkbox for sending the messages to the player
 local checkboxSendSelf = CreateFrame("CheckButton", "QuestProgressShareConfigSendSelfCheckbox", QPS.configFrame, "UICheckButtonTemplate")
 checkboxSendSelf:SetPoint("TOPLEFT", 20, -100)
-checkboxSendSelf:SetChecked(QuestProgressShareConfig.sendSelf)
+checkboxSendSelf:SetChecked(QuestProgressShareConfig.sendSelf == 1)
 checkboxSendSelf:SetScript("OnClick", function()
-    QuestProgressShareConfig.sendSelf = checkboxSendSelf:GetChecked()
+    QuestProgressShareConfig.sendSelf = checkboxSendSelf:GetChecked() and 1 or 0
 end)
 
 -- Label for the "Send to Self" checkbox
@@ -99,9 +94,9 @@ labelSendSelf:SetText("Send to Self")
 -- Checkbox for sending the messages to the public chat
 local checkboxSendPublic = CreateFrame("CheckButton", "QuestProgressShareConfigSendPublicCheckbox", QPS.configFrame, "UICheckButtonTemplate")
 checkboxSendPublic:SetPoint("TOPLEFT", 20, -130)
-checkboxSendPublic:SetChecked(QuestProgressShareConfig.sendPublic)
+checkboxSendPublic:SetChecked(QuestProgressShareConfig.sendPublic == 1)
 checkboxSendPublic:SetScript("OnClick", function()
-    QuestProgressShareConfig.sendPublic = checkboxSendPublic:GetChecked()
+    QuestProgressShareConfig.sendPublic = checkboxSendPublic:GetChecked() and 1 or 0
 end)
 
 -- Label for the "Send to Public" checkbox
@@ -112,9 +107,9 @@ labelSendPublic:SetText("Send to Public")
 -- Checkbox for sending only finished objectives
 local checkboxSendOnlyFinished = CreateFrame("CheckButton", "QuestProgressShareConfigSendOnlyFinishedCheckbox", QPS.configFrame, "UICheckButtonTemplate")
 checkboxSendOnlyFinished:SetPoint("TOPLEFT", 20, -160)
-checkboxSendOnlyFinished:SetChecked(QuestProgressShareConfig.sendOnlyFinished)
+checkboxSendOnlyFinished:SetChecked(QuestProgressShareConfig.sendOnlyFinished == 1)
 checkboxSendOnlyFinished:SetScript("OnClick", function()
-    QuestProgressShareConfig.sendOnlyFinished = checkboxSendOnlyFinished:GetChecked()
+    QuestProgressShareConfig.sendOnlyFinished = checkboxSendOnlyFinished:GetChecked() and 1 or 0
 end)
 
 -- Label for the "Send only finished" checkbox
@@ -125,9 +120,9 @@ labelSendOnlyFinished:SetText("Send only finished")
 -- Checkbox for sending starting quests
 local checkboxSendStartingQuests = CreateFrame("CheckButton", "QuestProgressShareConfigSendStartingQuestsCheckbox", QPS.configFrame, "UICheckButtonTemplate")
 checkboxSendStartingQuests:SetPoint("TOPLEFT", 20, -190)
-checkboxSendStartingQuests:SetChecked(QuestProgressShareConfig.sendStartingQuests)
+checkboxSendStartingQuests:SetChecked(QuestProgressShareConfig.sendStartingQuests == 1)
 checkboxSendStartingQuests:SetScript("OnClick", function()
-    QuestProgressShareConfig.sendStartingQuests = checkboxSendStartingQuests:GetChecked()
+    QuestProgressShareConfig.sendStartingQuests = checkboxSendStartingQuests:GetChecked() and 1 or 0
 end)
 
 -- Label for the "Send starting quests" checkbox
@@ -141,12 +136,12 @@ QPS.configFrame:SetScript("OnShow", function()
 end)
 
 function UpdateConfigFrame()
-    checkboxAddonEnabled:SetChecked(QuestProgressShareConfig.enabled)
-    checkboxSendInParty:SetChecked(QuestProgressShareConfig.sendInParty)
-    checkboxSendSelf:SetChecked(QuestProgressShareConfig.sendSelf)
-    checkboxSendPublic:SetChecked(QuestProgressShareConfig.sendPublic)
-    checkboxSendOnlyFinished:SetChecked(QuestProgressShareConfig.sendOnlyFinished)
-    checkboxSendStartingQuests:SetChecked(QuestProgressShareConfig.sendStartingQuests)
+    checkboxAddonEnabled:SetChecked(QuestProgressShareConfig.enabled == 1)
+    checkboxSendInParty:SetChecked(QuestProgressShareConfig.sendInParty == 1)
+    checkboxSendSelf:SetChecked(QuestProgressShareConfig.sendSelf == 1)
+    checkboxSendPublic:SetChecked(QuestProgressShareConfig.sendPublic == 1)
+    checkboxSendOnlyFinished:SetChecked(QuestProgressShareConfig.sendOnlyFinished == 1)
+    checkboxSendStartingQuests:SetChecked(QuestProgressShareConfig.sendStartingQuests == 1)
 end
 
 -- Close-Button
