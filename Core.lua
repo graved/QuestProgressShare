@@ -9,6 +9,7 @@ local completedQuestTitle = nil -- Stores the title of the quest being turned in
 local delayedQuestScanPending = false -- Indicates if a delayed scan is scheduled
 local delayedQuestScanFrame = CreateFrame("Frame")
 delayedQuestScanFrame:Hide()
+local suppressNextProgressMessages = false
 
 -- Triggers a delayed scan of the quest log (used when headers may be collapsed)
 local function DelayedQuestLogScan()
@@ -44,6 +45,7 @@ function OnEvent()
         -- Always assign a new table for per-character variable to avoid reference issues
         QPS.knownQuests = {}
         for k, v in pairs(QPS_SavedKnownQuests) do QPS.knownQuests[k] = v end
+        suppressNextProgressMessages = true -- Only suppress once after login/reload
         return
 
     -- Handle addon load: set default config and update config UI
@@ -84,7 +86,9 @@ function OnEvent()
             local title, _, _, isHeader, isCollapsed = GetQuestLogTitle(i)
             if isHeader then
                 headerStates[i] = isCollapsed
-                if isCollapsed then ExpandQuestHeader(i) end
+                if isCollapsed then
+                    ExpandQuestHeader(i)
+                end
             end
         end
         QPS.suppressQuestLogUpdate = false
@@ -174,7 +178,9 @@ function OnEvent()
                             isMeaningless = true
                         end
                     end
-                    if isComplete then
+                    if suppressNextProgressMessages then
+                        lastProgress[questKey] = text
+                    elseif isComplete then
                         if lastProgress[questKey] ~= "Quest completed" then
                             lastProgress[questKey] = "Quest completed"
                         end
@@ -204,6 +210,10 @@ function OnEvent()
                     end
                 end
             end
+        end
+        -- Reset suppression flag after the first scan only
+        if suppressNextProgressMessages then
+            suppressNextProgressMessages = false
         end
 
         -- Restore header (category) collapsed states
