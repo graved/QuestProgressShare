@@ -31,7 +31,6 @@ When the first quest update occurs after installing the addon, all current quest
 
 ### 1.1.5
 - Prevent "Quest accepted" message from showing when expanding quest categories
-- Save and restore the sendInParty flag on reload
 
 ### 1.1.3
 - Don't show "Quest completed" message when quest is abandoned
