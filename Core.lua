@@ -1,15 +1,16 @@
-local QPS = QuestProgressShare
+-- Core.lua - Main logic for QuestProgressShare
 
--- Global state
-QPS.suppressQuestLogUpdate = false
+local QPS = QuestProgressShare -- main addon table
 
--- Local state
-local lastProgress = {}
-local completedQuestTitle = nil -- Stores the title of the quest being turned in
-local delayedQuestScanPending = false -- Indicates if a delayed scan is scheduled
-local delayedQuestScanFrame = CreateFrame("Frame")
+QPS.suppressQuestLogUpdate = false -- prevent recursive or premature quest log updates
+
+local lastProgress = {} -- last known progress for each quest objective
+local completedQuestTitle = nil -- quest being turned in (for completion detection)
+local delayedQuestScanPending = false -- is a delayed scan scheduled
+local delayedQuestScanFrame = CreateFrame("Frame") -- frame for delayed quest log scan
+local firstProgressScan = true -- is this the first scan after login/reload
+
 delayedQuestScanFrame:Hide()
-local suppressNextProgressMessages = false
 
 -- Triggers a delayed scan of the quest log (used when headers may be collapsed)
 local function DelayedQuestLogScan()
@@ -29,32 +30,73 @@ end
 
 delayedQuestScanFrame:SetScript("OnUpdate", DelayedQuestScanOnUpdate)
 
--- Main event handler for all registered events
+-- Dummy scan to populate lastProgress without sending messages
+local function DummyQuestProgressScan()
+    for questIndex = 1, GetNumQuestLogEntries() do
+        local title, _, _, isHeader, _, _, isComplete = GetQuestLogTitle(questIndex)
+        if not isHeader then
+            SelectQuestLogEntry(questIndex)
+            local objectives = GetNumQuestLeaderBoards()
+            -- Handle turn-in only quests (no objectives)
+            if objectives == 0 and isComplete then
+                local questKey = title .. "-COMPLETE"
+                lastProgress[questKey] = "Quest completed"
+            end
+            for i = 1, objectives do
+                local text = GetQuestLogLeaderBoard(i)
+                local questKey = title .. "-" .. i
+                lastProgress[questKey] = text
+            end
+            if objectives > 0 then
+                local questKey = title .. "-COMPLETE"
+                if isComplete then
+                    lastProgress[questKey] = "Quest completed"
+                end
+            end
+        end
+    end
+end
+
+-- Helper to extract quest title from progress key using StringLib
+local function ExtractQuestTitleFromKey(key)
+    local len = StringLib.Len(key)
+    for i = 1, len do
+        if StringLib.Sub(key, i, i) == "-" then
+            return StringLib.Sub(key, 1, i - 1)
+        end
+    end
+    return nil
+end
+
+-- Handles quest progress tracking and event logic
 function OnEvent()
-    -- Handle quest completion (quest turn-in window opened)
+    -- Handles quest completion (quest turn-in window opened)
     if event == "QUEST_COMPLETE" then
         if GetTitleText then
             completedQuestTitle = GetTitleText()
         end
         return
 
-    -- Handle player login: initialize known quests and print loaded message
+    -- Handles player login: initializes known quests and prints loaded message
     elseif event == "PLAYER_LOGIN" then
         if DEFAULT_CHAT_FRAME then DEFAULT_CHAT_FRAME:AddMessage("|cffb48affQuestProgressShare|r loaded.") end
         if not QPS_SavedKnownQuests then QPS_SavedKnownQuests = {} end
-        -- Always assign a new table for per-character variable to avoid reference issues
         QPS.knownQuests = {}
         for k, v in pairs(QPS_SavedKnownQuests) do QPS.knownQuests[k] = v end
-        suppressNextProgressMessages = true -- Only suppress once after login/reload
+        -- Loads last progress from SavedVariables
+        if not QPS_SavedProgress then QPS_SavedProgress = {} end
+        for k, v in pairs(QPS_SavedProgress) do lastProgress[k] = v end
+        firstProgressScan = true
+        DummyQuestProgressScan() -- Populates lastProgress for any new quests
         return
 
-    -- Handle addon load: set default config and update config UI
+    -- Handles addon load: sets default config and updates config UI
     elseif event == "ADDON_LOADED" and arg1 == "QuestProgressShare" then
         QPS.config.SetDefaultConfigValues()
         UpdateConfigFrame()
         return
 
-    -- Handle entering world: delay quest log scanning until fully loaded
+    -- Handles entering world: delays quest log scanning until fully loaded
     elseif event == "PLAYER_ENTERING_WORLD" then
         QPS.ready = false
         if not QPS.delayFrame then
@@ -71,7 +113,7 @@ function OnEvent()
         end)
         return
         
-    -- Handle quest log updates: detect quest accept, completion, and progress
+    -- Handles quest log updates: detects quest accept, completion, and progress
     elseif event == "QUEST_LOG_UPDATE" and QuestProgressShareConfig.enabled then
         -- Prevent recursive or premature updates
         if QPS.suppressQuestLogUpdate then return end
@@ -80,7 +122,7 @@ function OnEvent()
 
         -- Save header (category) states and expand all for scanning
         local numEntries = GetNumQuestLogEntries()
-        local headerStates = {}
+        local headerStates = {} -- stores header collapsed state
         QPS.suppressQuestLogUpdate = true
         for i = 1, numEntries do
             local title, _, _, isHeader, isCollapsed = GetQuestLogTitle(i)
@@ -94,14 +136,14 @@ function OnEvent()
         QPS.suppressQuestLogUpdate = false
 
         -- Track quests that were in the previous log BEFORE updating knownQuests
-        local previousQuests = {}
+        local previousQuests = {} -- previous quest titles
         local previousCount = 0
         for k, v in pairs(QPS.knownQuests or {}) do
             previousQuests[k] = v
             previousCount = previousCount + 1
         end
 
-        local currentQuests = {}
+        local currentQuests = {} -- current quest titles
         local currentCount = 0
         local foundNewQuest = false
 
@@ -173,23 +215,24 @@ function OnEvent()
                     if type(text) ~= "string" then
                         isMeaningless = true
                     else
-                        local current, total = string.match(text, "(%d+)%s*/%s*(%d+)")
+                        local current, total = StringLib.SafeExtractNumbers(text, QPS_Debug)
                         if not current or tonumber(current) == 0 then
                             isMeaningless = true
                         end
                     end
-                    if suppressNextProgressMessages then
-                        lastProgress[questKey] = text
-                    elseif isComplete then
+                    if isComplete then
                         if lastProgress[questKey] ~= "Quest completed" then
                             lastProgress[questKey] = "Quest completed"
                         end
                     else
                         if (lastProgress[questKey] == nil or lastProgress[questKey] == "") then
-                            if not isMeaningless and (QuestProgressShareConfig.sendStartingQuests or (type(text) == "string" and string.sub(text, 1, 3) ~= " : ")) then
+                            if not isMeaningless and (QuestProgressShareConfig.sendStartingQuests or (type(text) == "string" and StringLib.Sub(text, 1, 3) ~= " : ")) then
                                 lastProgress[questKey] = text
-                                if (finished or not QuestProgressShareConfig.sendOnlyFinished) and (not completedQuestTitle or completedQuestTitle ~= title) then
-                                    QPS.chatMessage.Send(title, text, finished)
+                                -- Only send if not first scan, or if changed since last session
+                                if (not firstProgressScan) or (QPS_SavedProgress[questKey] ~= text) then
+                                    if (finished or not QuestProgressShareConfig.sendOnlyFinished) and (not completedQuestTitle or completedQuestTitle ~= title) then
+                                        QPS.chatMessage.Send(title, text, finished)
+                                    end
                                 end
                             end
                         elseif lastProgress[questKey] ~= text then
@@ -211,12 +254,33 @@ function OnEvent()
                 end
             end
         end
-        -- Reset suppression flag after the first scan only
-        if suppressNextProgressMessages then
-            suppressNextProgressMessages = false
+
+        -- Save lastProgress to SavedVariables after each scan
+        -- Clean up progress for quests no longer in the log
+        local activeQuestTitles = {}
+        for questIndex = 1, GetNumQuestLogEntries() do
+            local title, _, _, isHeader = GetQuestLogTitle(questIndex)
+            if not isHeader and title then
+                activeQuestTitles[title] = true
+            end
         end
 
-        -- Restore header (category) collapsed states
+        for k in pairs(lastProgress) do
+            local questTitle = ExtractQuestTitleFromKey(k)
+            if questTitle and not activeQuestTitles[questTitle] then
+                lastProgress[k] = nil
+            end
+        end
+        if QPS_SavedProgress then
+            for k in pairs(QPS_SavedProgress) do QPS_SavedProgress[k] = nil end
+        else
+            QPS_SavedProgress = {}
+        end
+        for k, v in pairs(lastProgress) do QPS_SavedProgress[k] = v end
+        -- After first scan, set flag to false
+        if firstProgressScan then firstProgressScan = false end
+
+        -- Restores header (category) collapsed states
         QPS.suppressQuestLogUpdate = true
         for i = 1, numEntries do
             if headerStates[i] then CollapseQuestHeader(i) end
@@ -225,7 +289,7 @@ function OnEvent()
     end
 end
 
--- Register for all relevant quest and addon events
+-- Registers for all relevant quest and addon events
 QPS:RegisterEvent("QUEST_LOG_UPDATE")
 QPS:RegisterEvent("PLAYER_LOGIN")
 QPS:RegisterEvent("ADDON_LOADED")
