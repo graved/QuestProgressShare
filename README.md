@@ -29,6 +29,10 @@ When the first quest update occurs after installing the addon, all current quest
 
 ## Changelog
 
+### 1.1.7
+- Add a custom string library to handle string.match (or similar) safely
+- Implement saved quest progress using saved character variables
+
 ### 1.1.6
 - Suppress quest progress messages on reload after collapsing quest headers
 
