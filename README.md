@@ -35,8 +35,9 @@ When the first quest update occurs after installing the addon, all current quest
 ### 1.2.0
 - Add pfQuest integration to send quest links instead of plain titles  
 - Use ChatThrottleLib to prevent addon compatibility issues  
-- Reorganize addon file structure  
-  Note: If pfQuest is not installed, the addon will still function using its legacy plain title messages.
+- Reorganize addon file structure 
+ 
+  **Note: If pfQuest is not installed, the addon will still function using its legacy plain title messages.**
 
 ### 1.1.7
 - Add a custom string library to handle string.match (or similar) safely
