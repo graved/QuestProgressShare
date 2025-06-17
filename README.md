@@ -33,9 +33,9 @@ When the first quest update occurs after installing the addon, all current quest
 - Prevent spam of "Quest accepted" messages on initial addon load
 
 ### 1.2.0
-- Add pfQuest integration to send quest links instead of plain titles
-- Use ChatThrottleLib to prevent addon compatibility issues
-- Reorganize addon file structure
+- Add pfQuest integration to send quest links instead of plain titles  
+- Use ChatThrottleLib to prevent addon compatibility issues  
+- Reorganize addon file structure  
   Note: If pfQuest is not installed, the addon will still function using its legacy plain title messages.
 
 ### 1.1.7
