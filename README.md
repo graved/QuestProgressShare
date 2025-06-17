@@ -29,6 +29,15 @@ When the first quest update occurs after installing the addon, all current quest
 
 ## Changelog
 
+### 1.2.1
+- Prevent spam of "Quest accepted" messages on initial addon load
+
+### 1.2.0
+- Add pfQuest integration to send quest links instead of plain titles
+- Use ChatThrottleLib to prevent addon compatibility issues
+- Reorganize addon file structure
+Note: If pfQuest is not installed, the addon will still function using its legacy plain title messages.
+
 ### 1.1.7
 - Add a custom string library to handle string.match (or similar) safely
 - Implement saved quest progress using saved character variables
