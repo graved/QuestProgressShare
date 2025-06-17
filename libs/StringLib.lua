@@ -1,5 +1,7 @@
 -- StringLib.lua: Minimal custom string library for QPS (to avoid global string pollution)
 
+local strchar_cache = string.char
+
 StringLib = {}
 StringLib._cache = {}
 
@@ -102,4 +104,88 @@ function StringLib.SafeExtractNumbers(str, debugFunc)
         if debugFunc then debugFunc("Failed to extract numbers from: " .. tostring(str)) end
     end
     return nil, nil
+end
+
+function StringLib.Find(s, pattern)
+    if type(s) ~= "string" or type(pattern) ~= "string" then return nil end
+    -- Only supports plain string search, not patterns
+    local slen = StringLib.Len(s)
+    local plen = StringLib.Len(pattern)
+    if plen == 0 or slen == 0 or plen > slen then return nil end
+    for i = 1, slen - plen + 1 do
+        if StringLib.Sub(s, i, i + plen - 1) == pattern then
+            return i
+        end
+    end
+    return nil
+end
+
+function StringLib.Gsub(s, pattern, repl)
+    -- Only supports plain string replacement, not patterns
+    if type(s) ~= "string" or type(pattern) ~= "string" or type(repl) ~= "string" then return s end
+    local out = ""
+    local i = 1
+    local slen = StringLib.Len(s)
+    local plen = StringLib.Len(pattern)
+    if plen == 0 then return s end
+    while i <= slen do
+        if StringLib.Sub(s, i, i + plen - 1) == pattern then
+            out = out .. repl
+            i = i + plen
+        else
+            out = out .. StringLib.Sub(s, i, i)
+            i = i + 1
+        end
+    end
+    return out
+end
+
+function StringLib.Match(s, pattern)
+    -- Only supports exact match or prefix match (pattern ending with *)
+    if type(s) ~= "string" or type(pattern) ~= "string" then return nil end
+    local plen = StringLib.Len(pattern)
+    if plen == 0 then return nil end
+    if StringLib.Sub(pattern, plen, plen) == "*" then
+        local prefix = StringLib.Sub(pattern, 1, plen - 1)
+        if StringLib.Sub(s, 1, plen - 1) == prefix then
+            return prefix
+        end
+    elseif s == pattern then
+        return s
+    end
+    return nil
+end
+
+-- Converts a byte (0-255) to a two-digit uppercase hex string using only StringLib
+function StringLib.ByteToHex(byte)
+    byte = tonumber(byte) or 0
+    local hexChars = "0123456789ABCDEF"
+    local high = math.floor(byte / 16) + 1
+    local low = byte - math.floor(byte / 16) * 16 + 1
+    return StringLib.Sub(hexChars, high, high) .. StringLib.Sub(hexChars, low, low)
+end
+
+function StringLib.PatternMatch(s, pattern)
+    -- Only supports a single capture group: '^(.+):' or similar
+    -- Returns the first capture, or nil if not matched
+    if type(s) ~= "string" or type(pattern) ~= "string" then return nil end
+    -- Only support patterns like "^(.+):" (prefix up to first colon)
+    if pattern == "^(.+):" then
+        local colon = StringLib.Find(s, ":")
+        if colon and colon > 1 then
+            return StringLib.Sub(s, 1, colon - 1)
+        end
+        return nil
+    end
+    -- Fallback: exact match
+    if s == pattern then return s end
+    return nil
+end
+
+-- Add StringLib.Char for ASCII code to character conversion
+function StringLib.Char(byte)
+    byte = tonumber(byte) or 0
+    if byte < 0 then byte = 0 end
+    if byte > 255 then byte = 255 end
+    return strchar_cache(byte)
 end
