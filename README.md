@@ -19,10 +19,11 @@ If you are playing with friends and want to share your quest progress, this AddO
 
 ## Features
 - Share quest progress
-    - with other players in the group
+    - with party members
     - with yourself
     - with local chat
 - Share all quest progress or only finished quests
+- Share quest links instead of plain titles (only if pfQuest is enabled)
 
 ## Changelog
 
