@@ -1,6 +1,8 @@
 # QuestProgressShare
 This AddOn sends quest progress to other players.
-If you are playing with friends and want to share your quest progress, this AddOn is for you.
+If you are playing with friends and want to share your quest progress, this AddOn is for you.  
+  
+If you encounter and issue or error, please make sure to report it in the [Bugtracker](https://github.com/Dreambjorn/QuestProgressShare/issues).
 
 ## Installation
 
