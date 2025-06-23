@@ -29,6 +29,9 @@ If you encounter any issues or errors, please report them in the [Bugtracker](ht
 
 ## Changelog
 
+### 1.4.1
+- Fix duplicate "Quest completed" message sent on quest completion
+
 ### 1.4.0
 - Add party progress tooltips showing real-time, color-coded quest progress for all party members
 - Implement live party sync so quest progress is always up to date for everyone
