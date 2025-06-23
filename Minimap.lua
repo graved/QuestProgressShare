@@ -1,3 +1,6 @@
+-- Minimap.lua: Handles minimap button and related UI for QuestProgressShare.
+-- Provides user access to config and quick actions from the minimap.
+
 local QPS = QuestProgressShare
 QPS.minimap = {}
 

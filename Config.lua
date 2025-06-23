@@ -1,37 +1,49 @@
+-- Config.lua: Manages configuration UI and default settings for QuestProgressShare.
+-- Handles creation of the config frame, checkboxes, and saving/loading of user preferences.
+
 local QPS = QuestProgressShare
 QPS.config = {}
 
+-- Sets default values for the QuestProgressShareConfig table if not already set.
 function QPS.config.SetDefaultConfigValues()
-    -- Set default values for the config options
+    -- Only set defaults if the config table does not exist
+    if type(QuestProgressShareConfig) ~= "table" then
+        QuestProgressShareConfig = {}
+    end
+
+    -- Only set to true if the value is nil (first install)
     if QuestProgressShareConfig.enabled == nil then
-        QuestProgressShareConfig.enabled = true
+        QuestProgressShareConfig.enabled = 1
     end
-
     if QuestProgressShareConfig.sendInParty == nil then
-        QuestProgressShareConfig.sendInParty = true
+        QuestProgressShareConfig.sendInParty = 1
     end
 
+    -- The rest of the config options
     if QuestProgressShareConfig.sendSelf == nil then
         QuestProgressShareConfig.sendSelf = false
     end
-
     if QuestProgressShareConfig.sendPublic == nil then
         QuestProgressShareConfig.sendPublic = false
     end
-
     if QuestProgressShareConfig.sendOnlyFinished == nil then
         QuestProgressShareConfig.sendOnlyFinished = false
     end
-
     if QuestProgressShareConfig.sendStartingQuests == nil then
         QuestProgressShareConfig.sendStartingQuests = false
+    end
+    if QuestProgressShareConfig.debugEnabled == nil then
+        QuestProgressShareConfig.debugEnabled = false
+    end
+    if QuestProgressShareConfig.sendAbandoned == nil then
+        QuestProgressShareConfig.sendAbandoned = false
     end
 end
 
 -- Create the config frame
 QPS.configFrame = CreateFrame("Frame", "QuestProgressShareConfigFrame", UIParent)
 QPS.configFrame:SetWidth(300)
-QPS.configFrame:SetHeight(270)
+QPS.configFrame:SetHeight(340)
 QPS.configFrame:SetPoint("CENTER", 0, 0)
 QPS.configFrame:SetBackdrop({
     bgFile = "Interface/Tooltips/UI-Tooltip-Background",
@@ -60,9 +72,9 @@ configTitle:SetText("Quest Progress Share - Settings")
 -- Checkbox for enabling/disabling the addon
 local checkboxAddonEnabled = CreateFrame("CheckButton", "QuestProgressShareConfigAddonEnabledCheckbox", QPS.configFrame, "UICheckButtonTemplate")
 checkboxAddonEnabled:SetPoint("TOPLEFT", 20, -40)
-checkboxAddonEnabled:SetChecked(QuestProgressShareConfig.enabled)
+checkboxAddonEnabled:SetChecked(QuestProgressShareConfig.enabled == 1)
 checkboxAddonEnabled:SetScript("OnClick", function()
-    QuestProgressShareConfig.enabled = checkboxAddonEnabled:GetChecked()
+    QuestProgressShareConfig.enabled = checkboxAddonEnabled:GetChecked() and 1 or 0
 end)
 
 -- Label for the "Enabled" checkbox
@@ -73,9 +85,9 @@ labelAddonEnabled:SetText("Enabled")
 -- Checkbox for sending the messages in party chat
 local checkboxSendInParty = CreateFrame("CheckButton", "QuestProgressShareConfigSendInPartyCheckbox", QPS.configFrame, "UICheckButtonTemplate")
 checkboxSendInParty:SetPoint("TOPLEFT", 20, -70)
-checkboxSendInParty:SetChecked(QuestProgressShareConfig.sendInParty)
+checkboxSendInParty:SetChecked(QuestProgressShareConfig.sendInParty == 1)
 checkboxSendInParty:SetScript("OnClick", function()
-    QuestProgressShareConfig.sendInParty = checkboxSendInParty:GetChecked()
+    QuestProgressShareConfig.sendInParty = checkboxSendInParty:GetChecked() and 1 or 0
 end)
 
 -- Label for the "Send in Party" checkbox
@@ -135,21 +147,49 @@ local labelSendStartingQuests = QPS.configFrame:CreateFontString("QuestProgressS
 labelSendStartingQuests:SetPoint("LEFT", checkboxSendStartingQuests, "RIGHT", 10, 0)
 labelSendStartingQuests:SetText("Send starting quests")
 
+-- Checkbox for sending abandoned quests
+local checkboxSendAbandoned = CreateFrame("CheckButton", "QuestProgressShareConfigSendAbandonedCheckbox", QPS.configFrame, "UICheckButtonTemplate")
+checkboxSendAbandoned:SetPoint("TOPLEFT", 20, -220)
+checkboxSendAbandoned:SetChecked(QuestProgressShareConfig.sendAbandoned)
+checkboxSendAbandoned:SetScript("OnClick", function()
+    QuestProgressShareConfig.sendAbandoned = checkboxSendAbandoned:GetChecked()
+end)
+
+-- Label for the "Send abandoned quests" checkbox
+local labelSendAbandoned = QPS.configFrame:CreateFontString("QuestProgressShareConfigSendAbandonedLabel", "OVERLAY", "GameFontNormal")
+labelSendAbandoned:SetPoint("LEFT", checkboxSendAbandoned, "RIGHT", 10, 0)
+labelSendAbandoned:SetText("Send abandoned quests")
+
+-- Checkbox for debug output
+local checkboxDebugEnabled = CreateFrame("CheckButton", "QuestProgressShareConfigDebugEnabledCheckbox", QPS.configFrame, "UICheckButtonTemplate")
+checkboxDebugEnabled:SetPoint("TOPLEFT", 20, -250)
+checkboxDebugEnabled:SetChecked(QuestProgressShareConfig.debugEnabled)
+checkboxDebugEnabled:SetScript("OnClick", function()
+    QuestProgressShareConfig.debugEnabled = checkboxDebugEnabled:GetChecked()
+end)
+
+local labelDebugEnabled = QPS.configFrame:CreateFontString("QuestProgressShareConfigDebugEnabledLabel", "OVERLAY", "GameFontNormal")
+labelDebugEnabled:SetPoint("LEFT", checkboxDebugEnabled, "RIGHT", 10, 0)
+labelDebugEnabled:SetText("Enable debug logging")
+
 -- Update the config options when the frame is shown
 QPS.configFrame:SetScript("OnShow", function()
     UpdateConfigFrame()
 end)
 
+-- Updates the state of all config checkboxes to match the current values in QuestProgressShareConfig.
 function UpdateConfigFrame()
-    checkboxAddonEnabled:SetChecked(QuestProgressShareConfig.enabled)
-    checkboxSendInParty:SetChecked(QuestProgressShareConfig.sendInParty)
+    checkboxAddonEnabled:SetChecked(QuestProgressShareConfig.enabled == 1)
+    checkboxSendInParty:SetChecked(QuestProgressShareConfig.sendInParty == 1)
     checkboxSendSelf:SetChecked(QuestProgressShareConfig.sendSelf)
     checkboxSendPublic:SetChecked(QuestProgressShareConfig.sendPublic)
     checkboxSendOnlyFinished:SetChecked(QuestProgressShareConfig.sendOnlyFinished)
     checkboxSendStartingQuests:SetChecked(QuestProgressShareConfig.sendStartingQuests)
+    checkboxSendAbandoned:SetChecked(QuestProgressShareConfig.sendAbandoned)
+    checkboxDebugEnabled:SetChecked(QuestProgressShareConfig.debugEnabled)
 end
 
--- Close-Button
+-- Creates and configures the Close button for the config frame.
 local closeButton = CreateFrame("Button", nil, QPS.configFrame, "UIPanelButtonTemplate")
 closeButton:SetWidth(80)
 closeButton:SetHeight(22)
