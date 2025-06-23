@@ -29,6 +29,22 @@ If you encounter any issues or errors, please report them in the [Bugtracker](ht
 
 ## Changelog
 
+### 1.4.0
+- Add party progress tooltips showing real-time, color-coded quest progress for all party members
+- Implement live party sync so quest progress is always up to date for everyone
+- Refactor core logic for clarity, maintainability, and robustness
+- Improve and unify debug logging for easier tracking and troubleshooting
+- Move string helper functions to QuestStringHelpers.lua for better organization
+- Add option to broadcast abandoned quests to your party (disabled by default, can be enabled in settings)
+- Improve handling of party member join/leave, quest completion, and quest abandonment for accurate progress display and cleanup
+- Enhance tooltip logic to robustly handle edge cases and only show current party members’ progress
+- Remove redundant logic between Core.lua and Tooltip.lua
+- Fix issues with party progress not updating correctly when members join, leave, or reconnect
+- Fix rare cases where tooltips could show outdated or incorrect progress
+- Fix color-coding inconsistencies for certain classes and completion states
+- Address edge cases where abandoned or completed quests could still appear in party progress
+- Improve documentation and inline comments for easier future maintenance
+
 ### 1.2.1
 - Prevent spam of "Quest accepted" messages on initial addon load
 
