@@ -14,6 +14,7 @@ local lastProgress = {} -- Tracks the most recent progress for each quest object
 local completedQuestTitle = nil -- Stores the title of the quest currently being turned in (for completion detection)
 local sentCompleted = {} -- Remembers which quests have already had a completion message sent this session to avoid duplicates
 local sentProgressThisSession = {} -- Remembers which progress updates have been sent in this session (per questKey)
+local justCompletedQuestTitle = nil -- Temporary flag to suppress duplicate completed message
 
 -- Suppress progress messages during initial scan after login/reload
 QPS._suppressInitialProgress = false
@@ -653,6 +654,7 @@ local function HandleQuestLogUpdate()
                 if QPS_SavedKnownQuests then QPS_SavedKnownQuests[data.title] = nil end
                 if QPS.knownQuests then QPS.knownQuests[data.title] = nil end
                 SyncSavedProgress()
+                justCompletedQuestTitle = data.title -- Set flag here
             elseif change.type == "progress" then
                 -- Only send progress if the objective is finished or config allows unfinished
                 local progressTitle = change.title or data.title
@@ -666,10 +668,16 @@ local function HandleQuestLogUpdate()
                 end
                 SyncSavedProgress()
             elseif change.type == "removed" then
+                -- Suppress duplicate "Quest completed" message if just completed
                 if completedQuestTitle and data.title == completedQuestTitle then
-                    SendQuestMessage(data.title, "Quest completed", true)
-                    QPS.Tooltip.BroadcastQuestCompleted(data.title)
-                    RemoveAllProgressForQuest(data.title)
+                    if justCompletedQuestTitle == data.title then
+                        LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Suppressed duplicate completed message for: " .. tostring(data.title))
+                        justCompletedQuestTitle = nil -- Reset flag
+                    else
+                        SendQuestMessage(data.title, "Quest completed", true)
+                        QPS.Tooltip.BroadcastQuestCompleted(data.title)
+                        RemoveAllProgressForQuest(data.title)
+                    end
                 else
                     -- Send abandoned message if not completed and config allows
                     if QuestProgressShareConfig.sendAbandoned then
