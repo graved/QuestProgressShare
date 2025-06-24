@@ -29,6 +29,9 @@ If you encounter any issues or errors, please report them in the [Bugtracker](ht
 
 ## Changelog
 
+### 1.4.3
+- Fix 'Quest completed' message reliability and stale progress cleanup on login
+
 ### 1.4.2
 - Fix missing "Quest abandoned" message on repeated quest abandonment
 
