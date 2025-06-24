@@ -29,6 +29,9 @@ If you encounter any issues or errors, please report them in the [Bugtracker](ht
 
 ## Changelog
 
+### 1.4.2
+- Fix missing "Quest abandoned" message on repeated quest abandonment
+
 ### 1.4.1
 - Fix duplicate "Quest completed" message sent on quest completion
 
