@@ -14,7 +14,6 @@ local lastProgress = {} -- Tracks the most recent progress for each quest object
 local completedQuestTitle = nil -- Stores the title of the quest currently being turned in (for completion detection)
 local sentCompleted = {} -- Remembers which quests have already had a completion message sent this session to avoid duplicates
 local sentProgressThisSession = {} -- Remembers which progress updates have been sent in this session (per questKey)
-local justCompletedQuests = {} -- File-local table for robust completion suppression
 
 -- Suppress progress messages during initial scan after login/reload
 QPS._suppressInitialProgress = false
@@ -636,7 +635,7 @@ local function HandleQuestLogUpdate()
             LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Processing change type: "..tostring(change.type)..", data.title: "..tostring(data.title))
             if change.type == "added" then
                 -- Always clear suppression for this quest so re-accepting allows completion message again
-                justCompletedQuests[data.title] = nil
+                sentCompleted[data.title] = nil
                 -- Always broadcast to addon channel for party sync
                 QPS.Tooltip.BroadcastQuestUpdate(data.title, "Quest accepted", false, "", "quest accepted")
                 -- Immediately broadcast all objectives for the new quest
@@ -654,15 +653,22 @@ local function HandleQuestLogUpdate()
                 DummyQuestProgressScan()
                 SyncSavedProgress()
             elseif change.type == "completed" then
-                -- Mark as just completed globally
-                justCompletedQuests[data.title] = true
+                LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Processing 'completed' change for: " .. tostring(data.title))
+                -- Mark as completed for suppression
+                sentCompleted[data.title] = true
+                LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] sentCompleted[" .. tostring(data.title) .. "] set to true (suppression)")
                 SendQuestMessage(data.title, "Quest completed", true)
+                LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Sent 'Quest completed' message for: " .. tostring(data.title))
                 QPS.Tooltip.BroadcastQuestCompleted(data.title)
+                LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Broadcasted quest completed for: " .. tostring(data.title))
                 RemoveAllProgressForQuest(data.title)
+                LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Removed all progress for: " .. tostring(data.title))
                 -- Always remove from known quests so re-accepting triggers 'Quest accepted' for repeatable/chain quests
                 if QPS_SavedKnownQuests then QPS_SavedKnownQuests[data.title] = nil end
                 if QPS.knownQuests then QPS.knownQuests[data.title] = nil end
+                LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Removed from knownQuests and QPS_SavedKnownQuests: " .. tostring(data.title))
                 SyncSavedProgress()
+                LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Synced saved progress after completion for: " .. tostring(data.title))
             elseif change.type == "progress" then
                 -- Only send progress if the objective is finished or config allows unfinished
                 local progressTitle = change.title or data.title
@@ -676,16 +682,18 @@ local function HandleQuestLogUpdate()
                 end
                 SyncSavedProgress()
             elseif change.type == "removed" then
-                -- Suppress duplicate "Quest completed" message if just completed
+                -- For instantly removed quests, send 'Quest completed' if it matches completedQuestTitle and hasn't already been sent
                 if completedQuestTitle and data.title == completedQuestTitle then
-                    if justCompletedQuests[data.title] then
-                        LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Suppressed duplicate completed message for: " .. tostring(data.title))
-                        justCompletedQuests[data.title] = nil -- Reset flag
-                    else
+                    if not sentCompleted[data.title] then
                         SendQuestMessage(data.title, "Quest completed", true)
                         QPS.Tooltip.BroadcastQuestCompleted(data.title)
                         RemoveAllProgressForQuest(data.title)
+                        sentCompleted[data.title] = true
+                        LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Sent 'Quest completed' for instantly removed quest: " .. tostring(data.title))
+                    else
+                        LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Suppressed duplicate completed message for: " .. tostring(data.title))
                     end
+                    completedQuestTitle = nil -- Always clear after handling
                 else
                     -- Send abandoned message if not completed and config allows
                     if QuestProgressShareConfig.sendAbandoned then
@@ -764,9 +772,15 @@ function OnEvent()
         QPS.knownQuests = {}
         for k, v in pairs(QPS_SavedKnownQuests) do QPS.knownQuests[k] = v end
 
-        -- Load last progress from SavedVariables
+        -- Load last progress from SavedVariables, but only for quests in QPS_SavedKnownQuests
         if not QPS_SavedProgress then QPS_SavedProgress = {} end
-        for k, v in pairs(QPS_SavedProgress) do lastProgress[k] = v end
+        for k in pairs(lastProgress) do lastProgress[k] = nil end -- clear any old data
+        for k, v in pairs(QPS_SavedProgress) do
+            local questTitle = string.match(k, "^(.-)-")
+            if questTitle and QPS_SavedKnownQuests[questTitle] then
+                lastProgress[k] = v
+            end
+        end
 
         -- Increment load count after login
         if QPS_SavedLoadCount == nil then QPS_SavedLoadCount = 0 end
