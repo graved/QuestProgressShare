@@ -14,7 +14,7 @@ local lastProgress = {} -- Tracks the most recent progress for each quest object
 local completedQuestTitle = nil -- Stores the title of the quest currently being turned in (for completion detection)
 local sentCompleted = {} -- Remembers which quests have already had a completion message sent this session to avoid duplicates
 local sentProgressThisSession = {} -- Remembers which progress updates have been sent in this session (per questKey)
-local justCompletedQuestTitle = nil -- Temporary flag to suppress duplicate completed message
+local justCompletedQuests = {} -- File-local table for robust completion suppression
 
 -- Suppress progress messages during initial scan after login/reload
 QPS._suppressInitialProgress = false
@@ -353,7 +353,7 @@ end
 
 -- Removes all lastProgress and QPS_SavedProgress entries for a given quest (by title)
 local function RemoveAllProgressForQuest(title)
-    -- Removes all progress and session state for a given quest title from lastProgress, QPS_SavedProgress, and sentProgressThisSession
+    -- Clears all progress and session state for the given quest from all tracking tables.
     if not title then return end
     local titleLen = StringLib.Len(title)
     -- Remove from lastProgress
@@ -371,12 +371,17 @@ local function RemoveAllProgressForQuest(title)
             end
         end
     end
-    -- Remove from sentProgressThisSession
+    -- Remove from sentProgressThisSession (all per-objective and completion keys for this quest)
     for k in pairs(sentProgressThisSession) do
         if StringLib.Sub(k, 1, titleLen + 1) == (title .. "-") or k == (title .. "-COMPLETE") then
             sentProgressThisSession[k] = nil
             LogDebugMessage(QPS_CoreDebugLog, '[QPS-FIX] RemoveAllProgressForQuest: Removing sentProgressThisSession['..k..'] for quest '..title)
         end
+    end
+    -- Also remove the base quest title key (for abandon/accept cycles)
+    if sentProgressThisSession[title] then
+        sentProgressThisSession[title] = nil
+        LogDebugMessage(QPS_CoreDebugLog, '[QPS-FIX] RemoveAllProgressForQuest: Removing sentProgressThisSession['..title..'] for quest '..title)
     end
     -- Remove completed suppression for this quest so re-accepting allows completion message again
     sentCompleted[title] = nil
@@ -630,6 +635,8 @@ local function HandleQuestLogUpdate()
             local data = change.data or {}
             LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Processing change type: "..tostring(change.type)..", data.title: "..tostring(data.title))
             if change.type == "added" then
+                -- Always clear suppression for this quest so re-accepting allows completion message again
+                justCompletedQuests[data.title] = nil
                 -- Always broadcast to addon channel for party sync
                 QPS.Tooltip.BroadcastQuestUpdate(data.title, "Quest accepted", false, "", "quest accepted")
                 -- Immediately broadcast all objectives for the new quest
@@ -647,6 +654,8 @@ local function HandleQuestLogUpdate()
                 DummyQuestProgressScan()
                 SyncSavedProgress()
             elseif change.type == "completed" then
+                -- Mark as just completed globally
+                justCompletedQuests[data.title] = true
                 SendQuestMessage(data.title, "Quest completed", true)
                 QPS.Tooltip.BroadcastQuestCompleted(data.title)
                 RemoveAllProgressForQuest(data.title)
@@ -654,7 +663,6 @@ local function HandleQuestLogUpdate()
                 if QPS_SavedKnownQuests then QPS_SavedKnownQuests[data.title] = nil end
                 if QPS.knownQuests then QPS.knownQuests[data.title] = nil end
                 SyncSavedProgress()
-                justCompletedQuestTitle = data.title -- Set flag here
             elseif change.type == "progress" then
                 -- Only send progress if the objective is finished or config allows unfinished
                 local progressTitle = change.title or data.title
@@ -670,9 +678,9 @@ local function HandleQuestLogUpdate()
             elseif change.type == "removed" then
                 -- Suppress duplicate "Quest completed" message if just completed
                 if completedQuestTitle and data.title == completedQuestTitle then
-                    if justCompletedQuestTitle == data.title then
+                    if justCompletedQuests[data.title] then
                         LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Suppressed duplicate completed message for: " .. tostring(data.title))
-                        justCompletedQuestTitle = nil -- Reset flag
+                        justCompletedQuests[data.title] = nil -- Reset flag
                     else
                         SendQuestMessage(data.title, "Quest completed", true)
                         QPS.Tooltip.BroadcastQuestCompleted(data.title)
@@ -720,18 +728,19 @@ function OnEvent()
     -- Main event handler for all registered events: dispatches logic for quest log updates, login, entering world, and more
     LogDebugMessage('QPS DEBUG: OnEvent ' .. tostring(event) .. ' ' .. tostring(arg1))
     -- Log every event received for debugging
-    LogDebugMessage("[QPS-INFO] Event received: " .. tostring(event) .. (arg1 and (", arg1: " .. tostring(arg1)) or ""))
+    LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Event received: " .. tostring(event) .. (arg1 and (", arg1: " .. tostring(arg1)) or ""))
     -- Quest turn-in: triggered when the quest completion window is opened
     if event == "QUEST_COMPLETE" then
         if GetTitleText then
             completedQuestTitle = GetTitleText()
+            LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] QUEST_COMPLETE: completedQuestTitle set to '" .. tostring(completedQuestTitle) .. "'")
         end
         return
 
     -- Player login: initialize known quests, print loaded message, and set up debug logs
     elseif event == "PLAYER_LOGIN" then
-        LogDebugMessage('QPS DEBUG: On PLAYER_LOGIN, QPS_SavedProgress:')
-        if QPS_SavedProgress then for k,v in pairs(QPS_SavedProgress) do LogDebugMessage('QPS DEBUG: QPS_SavedProgress ' .. k .. ' = ' .. tostring(v)) end end
+        LogDebugMessage(QPS_EventDebugLog, "QPS DEBUG: On PLAYER_LOGIN, QPS_SavedProgress:")
+        if QPS_SavedProgress then for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_EventDebugLog, 'QPS DEBUG: QPS_SavedProgress ' .. k .. ' = ' .. tostring(v)) end end
 
         if DEFAULT_CHAT_FRAME then
             DEFAULT_CHAT_FRAME:AddMessage("|cffb48affQuestProgressShare|r loaded.")
@@ -776,8 +785,8 @@ function OnEvent()
             QPS._didFirstLoadInit = true
         end
         sentCompleted = {}
-        LogDebugMessage('QPS DEBUG: On PLAYER_LOGIN, lastProgress after load:')
-        for k,v in pairs(lastProgress) do LogDebugMessage('QPS DEBUG: lastProgress ' .. k .. ' = ' .. tostring(v)) end
+        LogDebugMessage(QPS_EventDebugLog, 'QPS DEBUG: On PLAYER_LOGIN, lastProgress after load:')
+        for k,v in pairs(lastProgress) do LogDebugMessage(QPS_EventDebugLog, 'QPS DEBUG: lastProgress ' .. k .. ' = ' .. tostring(v)) end
         return
 
     -- Addon loaded: set default config and update config UI
@@ -859,19 +868,19 @@ function OnEvent()
 
     -- Quest item update: triggers quest log update logic for quest item changes
     elseif event == "QUEST_ITEM_UPDATE" then
-        LogDebugMessage("[QPS-INFO] HandleQuestLogUpdate triggered by QUEST_ITEM_UPDATE")
+        LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] HandleQuestLogUpdate triggered by QUEST_ITEM_UPDATE")
         HandleQuestLogUpdate()
         return
 
     -- Quest log update: detects quest accept, completion, and progress
     elseif event == "QUEST_LOG_UPDATE" and QuestProgressShareConfig.enabled == 1 then
-        LogDebugMessage("[QPS-INFO] HandleQuestLogUpdate triggered by QUEST_LOG_UPDATE")
+        LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] HandleQuestLogUpdate triggered by QUEST_LOG_UPDATE")
         HandleQuestLogUpdate()
 
     -- Player logout: saves progress and known quests
     elseif event == "PLAYER_LOGOUT" then
-        LogDebugMessage('QPS DEBUG: On PLAYER_LOGOUT, lastProgress:')
-        for k,v in pairs(lastProgress) do LogDebugMessage('QPS DEBUG: lastProgress ' .. k .. ' = ' .. tostring(v)) end
+        LogDebugMessage(QPS_EventDebugLog, 'QPS DEBUG: On PLAYER_LOGOUT, lastProgress:')
+        for k,v in pairs(lastProgress) do LogDebugMessage(QPS_EventDebugLog, 'QPS DEBUG: lastProgress ' .. k .. ' = ' .. tostring(v)) end
 
         -- Only update and save known quests if all headers are expanded
         if not AnyQuestLogHeadersCollapsed() then
