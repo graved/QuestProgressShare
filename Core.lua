@@ -152,12 +152,10 @@ end
 -- Sends a quest progress or completion message, using clickable links if possible
 local function SendQuestMessage(title, text, finished, questIndex, objectiveIndex, forceSend)
     -- Sends a quest progress or completion message to chat and party, using clickable links if available. Handles duplicate suppression and session state.
-    LogDebugMessage(QPS_CoreDebugLog, '[QPS-TRACE] SendQuestMessage called: title='..tostring(title)..', text='..tostring(text)..', finished='..tostring(finished)..', questIndex='..tostring(questIndex)..', objectiveIndex='..tostring(objectiveIndex)..', forceSend='..tostring(forceSend))
     local questKey = title
     if objectiveIndex then
         questKey = title .. '-' .. tostring(objectiveIndex)
     end
-    LogDebugMessage(QPS_CoreDebugLog, '[QPS-TRACE] sentProgressThisSession['..questKey..']='..tostring(sentProgressThisSession[questKey]))
     -- Always send "Quest accepted" regardless of duplicate suppression
     if text == "Quest accepted" then
         LogDebugMessage(QPS_CoreDebugLog, '[QPS-FIX] SendQuestMessage: Forcing send for "Quest accepted" for '..tostring(title))
@@ -171,8 +169,13 @@ local function SendQuestMessage(title, text, finished, questIndex, objectiveInde
             LogDebugMessage(QPS_CoreDebugLog, '[QPS-TRACE] SendQuestMessage: Suppressed completed for '..title..' (already sent)')
             return 
         end
-        if finished then sentCompleted[title] = true end
+        if finished then
+            LogDebugMessage(QPS_CoreDebugLog, '[QPS-TRACE] SendQuestMessage: Marking quest as completed for '..title)
+            sentCompleted[title] = true
+        end
     end
+    -- Only log when actually sending a message
+    LogDebugMessage(QPS_CoreDebugLog, '[QPS-TRACE] SendQuestMessage: Sending message: title='..tostring(title)..', text='..tostring(text)..', finished='..tostring(finished)..', questIndex='..tostring(questIndex)..', objectiveIndex='..tostring(objectiveIndex)..', forceSend='..tostring(forceSend))
     local questID = nil
     if pfDB then
         if questIndex then
@@ -203,6 +206,7 @@ local function SendQuestMessage(title, text, finished, questIndex, objectiveInde
         local link = GetClickableQuestLink(questID, title, pfDB, pfUI, pfQuestCompat, StringLib)
         -- Accept any link containing |Hquest: as a clickable quest link
         if link and type(link) == "string" and StringLib.Find(link, "|Hquest:") then
+            LogDebugMessage(QPS_CoreDebugLog, '[QPS-TRACE] SendQuestMessage: Sending clickable quest link for '..tostring(title)..' text='..tostring(text))
             QPS.chatMessage.SendLink(link, text, finished, objectiveIndex)
             if text ~= "Quest accepted" then
                 local questKey = title
@@ -214,6 +218,7 @@ local function SendQuestMessage(title, text, finished, questIndex, objectiveInde
             return
         end
     end
+    LogDebugMessage(QPS_CoreDebugLog, '[QPS-TRACE] SendQuestMessage: Sending plain text message for '..tostring(title)..' text='..tostring(text))
     QPS.chatMessage.Send(title, text, finished, objectiveIndex)
     if text ~= "Quest accepted" then
         local questKey = title
@@ -309,26 +314,26 @@ end
 local function SyncSavedProgress()
     -- Synchronizes QPS_SavedProgress with lastProgress, ensuring only valid progress strings are saved and completed states are handled correctly
     if not QPS_SavedProgress then QPS_SavedProgress = {} end
-    LogDebugMessage(QPS_CoreDebugLog, 'SyncSavedProgress: START')
-    LogDebugMessage(QPS_CoreDebugLog, 'SyncSavedProgress: QPS_SavedProgress BEFORE:')
-    for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_CoreDebugLog, 'QPS_SavedProgress['..tostring(k)..'] = '..tostring(v)) end
-    LogDebugMessage(QPS_CoreDebugLog, 'SyncSavedProgress: lastProgress:')
-    for k,v in pairs(lastProgress) do LogDebugMessage(QPS_CoreDebugLog, 'lastProgress['..tostring(k)..'] = '..tostring(v)) end
+    LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] SyncSavedProgress: START')
+    LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] SyncSavedProgress: QPS_SavedProgress BEFORE:')
+    for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] QPS_SavedProgress['..tostring(k)..'] = '..tostring(v)) end
+    LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] SyncSavedProgress: lastProgress:')
+    for k,v in pairs(lastProgress) do LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] lastProgress['..tostring(k)..'] = '..tostring(v)) end
     local prevSavedProgress = {}
     -- Remove keys not in lastProgress, and backup previous values in one loop
     for k in pairs(QPS_SavedProgress) do
         prevSavedProgress[k] = QPS_SavedProgress[k]
         if lastProgress[k] == nil then 
-            LogDebugMessage(QPS_CoreDebugLog, 'SyncSavedProgress: REMOVING key='..tostring(k)..' (not in lastProgress)')
+            LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] SyncSavedProgress: REMOVING key='..tostring(k)..' (not in lastProgress)')
             QPS_SavedProgress[k] = nil 
         end
     end
     -- Add/update keys from lastProgress
     for k, v in pairs(lastProgress) do
-        LogDebugMessage(QPS_CoreDebugLog, 'SyncSavedProgress: Checking key='..tostring(k)..' value='..tostring(v))
+        LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] SyncSavedProgress: Checking key='..tostring(k)..' value='..tostring(v))
         if type(v) == "string" and StringLib.Find(v, "%d+/%d+") then
             QPS_SavedProgress[k] = v
-            LogDebugMessage(QPS_CoreDebugLog, 'SyncSavedProgress: SAVED key='..tostring(k)..' value='..tostring(v))
+            LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] SyncSavedProgress: SAVED key='..tostring(k)..' value='..tostring(v))
         elseif v == "Quest completed" then
             local prev = nil
             if type(prevSavedProgress[k]) == "string" and StringLib.Find(prevSavedProgress[k], "%d+/%d+") then
@@ -336,18 +341,18 @@ local function SyncSavedProgress()
             end
             if prev then
                 QPS_SavedProgress[k] = prev
-                LogDebugMessage(QPS_CoreDebugLog, 'SyncSavedProgress: RESTORED previous numeric for key='..tostring(k)..' value='..tostring(prev))
+                LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] SyncSavedProgress: RESTORED previous numeric for key='..tostring(k)..' value='..tostring(prev))
             else
-                LogDebugMessage(QPS_CoreDebugLog, 'SyncSavedProgress: SKIPPED completed key='..tostring(k)..' (no previous numeric)')
+                LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] SyncSavedProgress: SKIPPED completed key='..tostring(k)..' (no previous numeric)')
             end
         else
-            LogDebugMessage(QPS_CoreDebugLog, 'SyncSavedProgress: SKIPPED key='..tostring(k)..' value='..tostring(v))
+            LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] SyncSavedProgress: SKIPPED key='..tostring(k)..' value='..tostring(v))
         end
         -- Never store "Quest completed" in QPS_SavedProgress
     end
-    LogDebugMessage(QPS_CoreDebugLog, 'SyncSavedProgress: QPS_SavedProgress AFTER:')
-    for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_CoreDebugLog, 'QPS_SavedProgress['..tostring(k)..'] = '..tostring(v)) end
-    LogDebugMessage(QPS_CoreDebugLog, 'SyncSavedProgress: END')
+    LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] SyncSavedProgress: QPS_SavedProgress AFTER:')
+    for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] QPS_SavedProgress['..tostring(k)..'] = '..tostring(v)) end
+    LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] SyncSavedProgress: END')
 end
 
 -- Removes all lastProgress and QPS_SavedProgress entries for a given quest (by title)
@@ -393,7 +398,7 @@ end
 local function HandleQuestLogUpdate()
     -- Handles all quest log update logic, including progress/completion detection, silent refresh, and party sync. Called from both QUEST_LOG_UPDATE and QUEST_ITEM_UPDATE events.
     LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG]: HandleQuestLogUpdate start, lastProgress:')
-    for k,v in pairs(lastProgress) do LogDebugMessage(QPS_CoreDebugLog, 'QPS DEBUG: lastProgress ' .. k .. ' = ' .. tostring(v)) end
+    for k,v in pairs(lastProgress) do LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] lastProgress ' .. k .. ' = ' .. tostring(v)) end
     if AnyQuestLogHeadersCollapsed() then
         LogDebugMessage(QPS_EventDebugLog, "[QPS-WARN] Quest log headers are collapsed; progress tracking paused. User action required.")
         if not QPS._notifiedCollapsed then
@@ -423,12 +428,12 @@ local function HandleQuestLogUpdate()
     if QPS._pendingSilentRefresh then
         LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Silent refresh triggered due to collapsed headers or entering world.")
         local currentSnapshot = BuildQuestLogSnapshot()
-        LogDebugMessage(QPS_CoreDebugLog, 'QPS DEBUG: HandleQuestLogUpdate currentSnapshot:')
+        LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] HandleQuestLogUpdate currentSnapshot:')
         for hash, data in pairs(currentSnapshot) do
-            LogDebugMessage(QPS_CoreDebugLog, 'QPS DEBUG: currentSnapshot ' .. hash .. ' ' .. tostring(data.title) .. ' ' .. tostring(data.level))
+            LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] currentSnapshot ' .. hash .. ' ' .. tostring(data.title) .. ' ' .. tostring(data.level))
             if data.objectives then
                 for i, obj in ipairs(data.objectives) do
-                    LogDebugMessage(QPS_CoreDebugLog, 'QPS DEBUG:   obj ' .. i .. ' ' .. tostring(obj.text) .. ' ' .. tostring(obj.finished))
+                    LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG]   obj ' .. i .. ' ' .. tostring(obj.text) .. ' ' .. tostring(obj.finished))
                 end
             end
         end
@@ -560,22 +565,23 @@ local function HandleQuestLogUpdate()
                     LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] Progress check for questKey=' .. tostring(questKey) .. ', lastProgress=' .. tostring(lastProgress[questKey]) .. ', obj.text=' .. tostring(obj.text) .. ', isMeaningless=' .. tostring(isMeaningless))
                     if obj.finished then
                         if lastProgress[questKey] ~= obj.text and lastProgress[questKey] ~= "Quest completed" then
-                            LogDebugMessage(QPS_CoreDebugLog, 'QPS DEBUG: SENDING progress ' .. questKey .. ' ' .. tostring(obj.text))
+                            LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] SENDING progress ' .. questKey .. ' ' .. tostring(obj.text))
                             LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Objective progress: " .. questKey .. " changed from '" .. tostring(lastProgress[questKey]) .. "' to '" .. tostring(obj.text) .. "'")
-                            -- Instead of sending the message directly, record the change in the changes table
-                            LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] Recording progress change for ' .. questKey .. ' ' .. tostring(obj.text))
+                            -- Only set finished=true if the entire quest is complete
+                            local isQuestComplete = newData.isComplete
+                            LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] Recording progress change for ' .. questKey .. ' ' .. tostring(obj.text) .. ' finished=' .. tostring(isQuestComplete))
                             table.insert(changes, {
                                 type = "progress",
                                 title = newData.title,
                                 text = obj.text,
-                                finished = obj.finished,
+                                finished = isQuestComplete, -- Only true if the whole quest is complete
                                 questIndex = newData.questIndex,
                                 objectiveIndex = i
                             })
                             lastProgress[questKey] = obj.text -- Prevent repeated sending of final progress
                         end
                         if lastProgress[questKey] ~= "Quest completed" then
-                            LogDebugMessage(QPS_CoreDebugLog, 'QPS DEBUG: Marking as completed ' .. questKey)
+                            LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] Marking as completed ' .. questKey)
                             LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Objective completed: " .. questKey)
                             lastProgress[questKey] = "Quest completed"
                         end
@@ -734,7 +740,7 @@ end
 -- Main event handler for all registered events
 function OnEvent()
     -- Main event handler for all registered events: dispatches logic for quest log updates, login, entering world, and more
-    LogDebugMessage('QPS DEBUG: OnEvent ' .. tostring(event) .. ' ' .. tostring(arg1))
+    LogDebugMessage('[QPS-DEBUG] OnEvent ' .. tostring(event) .. ' ' .. tostring(arg1))
     -- Log every event received for debugging
     LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Event received: " .. tostring(event) .. (arg1 and (", arg1: " .. tostring(arg1)) or ""))
     -- Quest turn-in: triggered when the quest completion window is opened
@@ -747,8 +753,8 @@ function OnEvent()
 
     -- Player login: initialize known quests, print loaded message, and set up debug logs
     elseif event == "PLAYER_LOGIN" then
-        LogDebugMessage(QPS_EventDebugLog, "QPS DEBUG: On PLAYER_LOGIN, QPS_SavedProgress:")
-        if QPS_SavedProgress then for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_EventDebugLog, 'QPS DEBUG: QPS_SavedProgress ' .. k .. ' = ' .. tostring(v)) end end
+        LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] On PLAYER_LOGIN, QPS_SavedProgress:")
+        if QPS_SavedProgress then for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_EventDebugLog, '[QPS-DEBUG] QPS_SavedProgress ' .. k .. ' = ' .. tostring(v)) end end
 
         if DEFAULT_CHAT_FRAME then
             DEFAULT_CHAT_FRAME:AddMessage("|cffb48affQuestProgressShare|r loaded.")
@@ -776,7 +782,7 @@ function OnEvent()
         if not QPS_SavedProgress then QPS_SavedProgress = {} end
         for k in pairs(lastProgress) do lastProgress[k] = nil end -- clear any old data
         for k, v in pairs(QPS_SavedProgress) do
-            local questTitle = string.match(k, "^(.-)-")
+            local questTitle = StringLib.Match(k, "^(.-)-")
             if questTitle and QPS_SavedKnownQuests[questTitle] then
                 lastProgress[k] = v
             end
@@ -799,8 +805,8 @@ function OnEvent()
             QPS._didFirstLoadInit = true
         end
         sentCompleted = {}
-        LogDebugMessage(QPS_EventDebugLog, 'QPS DEBUG: On PLAYER_LOGIN, lastProgress after load:')
-        for k,v in pairs(lastProgress) do LogDebugMessage(QPS_EventDebugLog, 'QPS DEBUG: lastProgress ' .. k .. ' = ' .. tostring(v)) end
+        LogDebugMessage(QPS_EventDebugLog, '[QPS-DEBUG] On PLAYER_LOGIN, lastProgress after load:')
+        for k,v in pairs(lastProgress) do LogDebugMessage(QPS_EventDebugLog, '[QPS-DEBUG] lastProgress ' .. k .. ' = ' .. tostring(v)) end
         return
 
     -- Addon loaded: set default config and update config UI
@@ -811,8 +817,8 @@ function OnEvent()
 
     -- Entering world: delay quest log scanning until fully loaded, then initialize state
     elseif event == "PLAYER_ENTERING_WORLD" then
-        LogDebugMessage('QPS DEBUG: On PLAYER_ENTERING_WORLD, lastProgress before DummyQuestProgressScan:')
-        for k,v in pairs(lastProgress) do LogDebugMessage('QPS DEBUG: lastProgress ' .. k .. ' = ' .. tostring(v)) end
+        LogDebugMessage('[QPS-DEBUG] On PLAYER_ENTERING_WORLD, lastProgress before DummyQuestProgressScan:')
+        for k,v in pairs(lastProgress) do LogDebugMessage('[QPS-DEBUG] lastProgress ' .. k .. ' = ' .. tostring(v)) end
         QPS.ready = false
         if not QPS.delayFrame then
             QPS.delayFrame = CreateFrame("Frame")
@@ -844,12 +850,12 @@ function OnEvent()
                     DummyQuestProgressScan()
 
                     -- Save lastProgress to SavedVariables (clear old data first)
-                    LogDebugMessage(QPS_CoreDebugLog, 'QPS DEBUG: PLAYER_ENTERING_WORLD: QPS_SavedProgress BEFORE:')
-                    if QPS_SavedProgress then for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_CoreDebugLog, 'QPS_SavedProgress['..tostring(k)..'] = '..tostring(v)) end end
+                    LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] PLAYER_ENTERING_WORLD: QPS_SavedProgress BEFORE:')
+                    if QPS_SavedProgress then for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] QPS_SavedProgress['..tostring(k)..'] = '..tostring(v)) end end
                     -- Use SyncSavedProgress to handle saving logic
                     SyncSavedProgress()
-                    LogDebugMessage(QPS_CoreDebugLog, 'QPS DEBUG: PLAYER_ENTERING_WORLD: QPS_SavedProgress AFTER:')
-                    if QPS_SavedProgress then for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_CoreDebugLog, 'QPS_SavedProgress['..tostring(k)..'] = '..tostring(v)) end end
+                    LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] PLAYER_ENTERING_WORLD: QPS_SavedProgress AFTER:')
+                    if QPS_SavedProgress then for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] QPS_SavedProgress['..tostring(k)..'] = '..tostring(v)) end end
 
                     -- Also update known quests
                     for questIndex = 1, QPSGet_NumQuestLogEntries() do
@@ -874,8 +880,8 @@ function OnEvent()
                     DummyQuestProgressScan() -- Populates lastProgress for any new quests
                 end
                 QPS._suppressInitialProgress = false
-                LogDebugMessage('QPS DEBUG: On PLAYER_ENTERING_WORLD, lastProgress after DummyQuestProgressScan:')
-                for k,v in pairs(lastProgress) do LogDebugMessage('QPS DEBUG: lastProgress ' .. k .. ' = ' .. tostring(v)) end
+                LogDebugMessage(QPS_EventDebugLog, '[QPS-DEBUG] On PLAYER_ENTERING_WORLD, lastProgress after DummyQuestProgressScan:')
+                for k,v in pairs(lastProgress) do LogDebugMessage(QPS_EventDebugLog, '[QPS-DEBUG] lastProgress key='..tostring(k)..', value='..tostring(v)) end
             end
         end)
         return
@@ -893,8 +899,8 @@ function OnEvent()
 
     -- Player logout: saves progress and known quests
     elseif event == "PLAYER_LOGOUT" then
-        LogDebugMessage(QPS_EventDebugLog, 'QPS DEBUG: On PLAYER_LOGOUT, lastProgress:')
-        for k,v in pairs(lastProgress) do LogDebugMessage(QPS_EventDebugLog, 'QPS DEBUG: lastProgress ' .. k .. ' = ' .. tostring(v)) end
+        LogDebugMessage(QPS_EventDebugLog, '[QPS-DEBUG] On PLAYER_LOGOUT, lastProgress:')
+        for k,v in pairs(lastProgress) do LogDebugMessage(QPS_EventDebugLog, '[QPS-DEBUG] lastProgress ' .. k .. ' = ' .. tostring(v)) end
 
         -- Only update and save known quests if all headers are expanded
         if not AnyQuestLogHeadersCollapsed() then
@@ -908,14 +914,13 @@ function OnEvent()
                 QPS_SavedKnownQuests[data.title] = true
             end
         end
-
         -- Save lastProgress to QPS_SavedProgress on logout only
-        LogDebugMessage(QPS_CoreDebugLog, 'QPS DEBUG: PLAYER_LOGOUT: QPS_SavedProgress BEFORE:')
-        if QPS_SavedProgress then for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_CoreDebugLog, 'QPS_SavedProgress['..tostring(k)..'] = '..tostring(v)) end end
+        LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] PLAYER_LOGOUT: QPS_SavedProgress BEFORE:')
+        if QPS_SavedProgress then for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] QPS_SavedProgress['..tostring(k)..'] = '..tostring(v)) end end
         -- Use SyncSavedProgress to handle saving logic
         SyncSavedProgress()
-        LogDebugMessage(QPS_CoreDebugLog, 'QPS DEBUG: PLAYER_LOGOUT: QPS_SavedProgress AFTER:')
-        if QPS_SavedProgress then for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_CoreDebugLog, 'QPS_SavedProgress['..tostring(k)..'] = '..tostring(v)) end end
+        LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] PLAYER_LOGOUT: QPS_SavedProgress AFTER:')
+        if QPS_SavedProgress then for k,v in pairs(QPS_SavedProgress) do LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] QPS_SavedProgress['..tostring(k)..'] = '..tostring(v)) end end
         return
     end
 end

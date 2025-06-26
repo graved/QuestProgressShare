@@ -29,6 +29,9 @@ If you encounter any issues or errors, please report them in the [Bugtracker](ht
 
 ## Changelog
 
+### 1.4.4
+- Fix missing final progress messages for completed objectives in multi-objective quests
+
 ### 1.4.3
 - Fix 'Quest completed' message reliability and stale progress cleanup on login
 

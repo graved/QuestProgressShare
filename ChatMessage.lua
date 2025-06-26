@@ -15,17 +15,30 @@ function QPS.chatMessage.Send(title, text, finished, objectiveIndex)
 
     local message = title .. " - " .. text
 
+    -- Determine color: green if objective is complete or over-complete, red otherwise
+    local isObjectiveComplete = false
+    local current, required = StringLib.SafeExtractNumbers(text or "")
+    if current and required then
+        current = tonumber(current)
+        required = tonumber(required)
+        if current and required and current >= required then
+            isObjectiveComplete = true
+        end
+    end
+    -- If finished is true (whole quest complete), always green
+    if finished then isObjectiveComplete = true end
+
     -- Send the message to the default chatframe
     if (QuestProgressShareConfig.sendSelf) then
-        if finished then
+        if isObjectiveComplete then
             DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. message, 0, 1, 0)
         else
             DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. message, 1, 0, 0)
         end
     end
 
-    -- Color the message green if the objective is finished, red otherwise
-    if finished then
+    -- Color the message green if the objective is complete/over-complete, red otherwise
+    if isObjectiveComplete then
         message = "|cff00ff00" .. message .. "|r"
     else
         message = "|cffff0000" .. message .. "|r"
@@ -52,8 +65,19 @@ function QPS.chatMessage.SendLink(title, text, finished, objectiveIndex)
     LogDebugMessage(QPS_CoreDebugLog, "[QPS-DEBUG] sendSelf=" .. tostring(QuestProgressShareConfig.sendSelf) .. ", sendPublic=" .. tostring(QuestProgressShareConfig.sendPublic) .. ", sendInParty=" .. tostring(QuestProgressShareConfig.sendInParty))
 
     local message
+    local isObjectiveComplete = false
+    local current, required = StringLib.SafeExtractNumbers(text or "")
+    if current and required then
+        current = tonumber(current)
+        required = tonumber(required)
+        if current and required and current >= required then
+            isObjectiveComplete = true
+        end
+    end
+    if finished then isObjectiveComplete = true end
+
     if text and text ~= "" then
-        if finished then
+        if isObjectiveComplete then
             message = title .. " - " .. "|cff00ff00" .. text .. "|r"
         else
             message = title .. " - " .. "|cffff0000" .. text .. "|r"
@@ -67,7 +91,7 @@ function QPS.chatMessage.SendLink(title, text, finished, objectiveIndex)
     end
     -- Send to self (show in local chat frame, not whisper)
     if QuestProgressShareConfig.sendSelf then
-        if finished then
+        if isObjectiveComplete then
             DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. message, 0, 1, 0)
         else
             DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. message, 1, 0, 0)
