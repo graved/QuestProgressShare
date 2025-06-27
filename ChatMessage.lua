@@ -5,8 +5,8 @@ local QPS = QuestProgressShare
 QPS.chatMessage = {}
 
 -- Sends a quest progress message to chat, party, and/or addon channels based on config.
-function QPS.chatMessage.Send(title, text, finished, objectiveIndex)
-    LogDebugMessage(QPS_CoreDebugLog, "[QPS-DEBUG] QPS.chatMessage.Send called: title=" .. tostring(title) .. ", text=" .. tostring(text) .. ", finished=" .. tostring(finished) .. ", objectiveIndex=" .. tostring(objectiveIndex))
+function QPS.chatMessage.Send(title, text, finished, objectiveIndex, objectiveFinished)
+    LogDebugMessage(QPS_CoreDebugLog, "[QPS-DEBUG] QPS.chatMessage.Send called: title=" .. tostring(title) .. ", text=" .. tostring(text) .. ", finished=" .. tostring(finished) .. ", objectiveIndex=" .. tostring(objectiveIndex) .. ", objectiveFinished=" .. tostring(objectiveFinished))
     if QuestProgressShareConfig then
         LogDebugMessage(QPS_CoreDebugLog, "[QPS-DEBUG] sendSelf=" .. tostring(QuestProgressShareConfig.sendSelf) .. ", sendPublic=" .. tostring(QuestProgressShareConfig.sendPublic) .. ", sendInParty=" .. tostring(QuestProgressShareConfig.sendInParty))
     else
@@ -17,16 +17,20 @@ function QPS.chatMessage.Send(title, text, finished, objectiveIndex)
 
     -- Determine color: green if objective is complete or over-complete, red otherwise
     local isObjectiveComplete = false
-    local current, required = StringLib.SafeExtractNumbers(text or "")
-    if current and required then
-        current = tonumber(current)
-        required = tonumber(required)
-        if current and required and current >= required then
-            isObjectiveComplete = true
+    if objectiveFinished == true then
+        isObjectiveComplete = true
+    else
+        local current, required = StringLib.SafeExtractNumbers(text or "")
+        if current and required then
+            current = tonumber(current)
+            required = tonumber(required)
+            if current and required and current >= required then
+                isObjectiveComplete = true
+            end
         end
+        -- If finished is true (whole quest complete), always green
+        if finished then isObjectiveComplete = true end
     end
-    -- If finished is true (whole quest complete), always green
-    if finished then isObjectiveComplete = true end
 
     -- Send the message to the default chatframe
     if (QuestProgressShareConfig.sendSelf) then
@@ -56,8 +60,8 @@ function QPS.chatMessage.Send(title, text, finished, objectiveIndex)
 end
 
 -- Sends a quest progress message with a clickable link to chat, party, and/or addon channels based on config.
-function QPS.chatMessage.SendLink(title, text, finished, objectiveIndex)
-    LogDebugMessage(QPS_CoreDebugLog, "[QPS-DEBUG] QPS.chatMessage.SendLink called: title=" .. tostring(title) .. ", text=" .. tostring(text) .. ", finished=" .. tostring(finished) .. ", objectiveIndex=" .. tostring(objectiveIndex))
+function QPS.chatMessage.SendLink(title, text, finished, objectiveIndex, objectiveFinished)
+    LogDebugMessage(QPS_CoreDebugLog, "[QPS-DEBUG] QPS.chatMessage.SendLink called: title=" .. tostring(title) .. ", text=" .. tostring(text) .. ", finished=" .. tostring(finished) .. ", objectiveIndex=" .. tostring(objectiveIndex) .. ", objectiveFinished=" .. tostring(objectiveFinished))
     if not QuestProgressShareConfig or QuestProgressShareConfig.enabled ~= 1 then
         LogDebugMessage(QPS_CoreDebugLog, "[QPS-DEBUG] SendLink: config missing or disabled! enabled=" .. tostring(QuestProgressShareConfig and QuestProgressShareConfig.enabled))
         return
@@ -66,39 +70,40 @@ function QPS.chatMessage.SendLink(title, text, finished, objectiveIndex)
 
     local message
     local isObjectiveComplete = false
-    local current, required = StringLib.SafeExtractNumbers(text or "")
-    if current and required then
-        current = tonumber(current)
-        required = tonumber(required)
-        if current and required and current >= required then
-            isObjectiveComplete = true
+    if objectiveFinished == true then
+        isObjectiveComplete = true
+    else
+        local current, required = StringLib.SafeExtractNumbers(text or "")
+        if current and required then
+            current = tonumber(current)
+            required = tonumber(required)
+            if current and required and current >= required then
+                isObjectiveComplete = true
+            end
         end
+        if finished then isObjectiveComplete = true end
     end
-    if finished then isObjectiveComplete = true end
 
     if text and text ~= "" then
         if isObjectiveComplete then
-            message = title .. " - " .. "|cff00ff00" .. text .. "|r"
+            message = title .. " |cff00ff00- " .. text .. "|r"
         else
-            message = title .. " - " .. "|cffff0000" .. text .. "|r"
+            message = title .. " |cffff0000- " .. text .. "|r"
         end
     else
         message = title
     end
-    -- Send to party
-    if QuestProgressShareConfig.sendInParty and (GetNumPartyMembers() > 0) then
-        ChatThrottleLib:SendChatMessage("NORMAL", "QPS", message, "PARTY")
+
+    -- Send the message to the default chatframe
+    if (QuestProgressShareConfig.sendSelf) then
+        DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. message)
     end
-    -- Send to self (show in local chat frame, not whisper)
-    if QuestProgressShareConfig.sendSelf then
-        if isObjectiveComplete then
-            DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. message, 0, 1, 0)
-        else
-            DEFAULT_CHAT_FRAME:AddMessage("[" .. UnitName("player") .. "]: " .. message, 1, 0, 0)
-        end
-    end
-    -- Send to public (SAY)
-    if QuestProgressShareConfig.sendPublic then
+    -- Send the message to the public chat
+    if (QuestProgressShareConfig.sendPublic) then
         ChatThrottleLib:SendChatMessage("NORMAL", "QPS", message, "SAY")
+    end
+    -- Send the message to the party chat
+    if (QuestProgressShareConfig.sendInParty == 1 and GetNumPartyMembers() > 0) then
+        ChatThrottleLib:SendChatMessage("NORMAL", "QPS", message, "PARTY")
     end
 end

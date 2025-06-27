@@ -149,9 +149,9 @@ local function FindQuestIDByTitle(title)
     return nil
 end
 
--- Sends a quest progress or completion message, using clickable links if possible
-local function SendQuestMessage(title, text, finished, questIndex, objectiveIndex, forceSend)
-    -- Sends a quest progress or completion message to chat and party, using clickable links if available. Handles duplicate suppression and session state.
+-- Sends a quest progress or completion message to chat and party, using clickable links if available
+local function SendQuestMessage(title, text, finished, questIndex, objectiveIndex, forceSend, objectiveFinished)
+    -- Handles duplicate suppression and session state
     local questKey = title
     if objectiveIndex then
         questKey = title .. '-' .. tostring(objectiveIndex)
@@ -175,7 +175,7 @@ local function SendQuestMessage(title, text, finished, questIndex, objectiveInde
         end
     end
     -- Only log when actually sending a message
-    LogDebugMessage(QPS_CoreDebugLog, '[QPS-TRACE] SendQuestMessage: Sending message: title='..tostring(title)..', text='..tostring(text)..', finished='..tostring(finished)..', questIndex='..tostring(questIndex)..', objectiveIndex='..tostring(objectiveIndex)..', forceSend='..tostring(forceSend))
+    LogDebugMessage(QPS_CoreDebugLog, '[QPS-TRACE] SendQuestMessage: Sending message: title='..tostring(title)..', text='..tostring(text)..', finished='..tostring(finished)..', questIndex='..tostring(questIndex)..', objectiveIndex='..tostring(objectiveIndex)..', forceSend='..tostring(forceSend)..', objectiveFinished='..tostring(objectiveFinished))
     local questID = nil
     if pfDB then
         if questIndex then
@@ -207,7 +207,8 @@ local function SendQuestMessage(title, text, finished, questIndex, objectiveInde
         -- Accept any link containing |Hquest: as a clickable quest link
         if link and type(link) == "string" and StringLib.Find(link, "|Hquest:") then
             LogDebugMessage(QPS_CoreDebugLog, '[QPS-TRACE] SendQuestMessage: Sending clickable quest link for '..tostring(title)..' text='..tostring(text))
-            QPS.chatMessage.SendLink(link, text, finished, objectiveIndex)
+            -- Pass both finished (quest-level) and objectiveFinished (per-objective) to downstream consumers
+            QPS.chatMessage.SendLink(link, text, finished, objectiveIndex, objectiveFinished)
             if text ~= "Quest accepted" then
                 local questKey = title
                 if objectiveIndex then
@@ -219,7 +220,8 @@ local function SendQuestMessage(title, text, finished, questIndex, objectiveInde
         end
     end
     LogDebugMessage(QPS_CoreDebugLog, '[QPS-TRACE] SendQuestMessage: Sending plain text message for '..tostring(title)..' text='..tostring(text))
-    QPS.chatMessage.Send(title, text, finished, objectiveIndex)
+    -- Pass both finished (quest-level) and objectiveFinished (per-objective) to downstream consumers
+    QPS.chatMessage.Send(title, text, finished, objectiveIndex, objectiveFinished)
     if text ~= "Quest accepted" then
         local questKey = title
         if objectiveIndex then
@@ -575,6 +577,7 @@ local function HandleQuestLogUpdate()
                                 title = newData.title,
                                 text = obj.text,
                                 finished = isQuestComplete, -- Only true if the whole quest is complete
+                                objectiveFinished = obj.finished, -- Per-objective completion
                                 questIndex = newData.questIndex,
                                 objectiveIndex = i
                             })
@@ -599,6 +602,7 @@ local function HandleQuestLogUpdate()
                                     title = newData.title,
                                     text = obj.text,
                                     finished = obj.finished,
+                                    objectiveFinished = obj.finished, -- Per-objective completion
                                     questIndex = newData.questIndex,
                                     objectiveIndex = i
                                 })
@@ -678,14 +682,14 @@ local function HandleQuestLogUpdate()
             elseif change.type == "progress" then
                 -- Only send progress if the objective is finished or config allows unfinished
                 local progressTitle = change.title or data.title
-                if change.finished or not QuestProgressShareConfig.sendOnlyFinished then
+                if change.objectiveFinished or not QuestProgressShareConfig.sendOnlyFinished then
                     LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Progress sent for " .. (progressTitle or "<nil>") .. "-" .. tostring(change.objectiveIndex) .. ": '" .. tostring(change.text) .. "'")
-                    SendQuestMessage(progressTitle, change.text, change.finished, change.questIndex, change.objectiveIndex)
-                    -- Broadcast progress update to party
-                    QPS.Tooltip.BroadcastQuestUpdate(progressTitle, change.text, change.finished, change.objectiveIndex, "progress")
+                    SendQuestMessage(progressTitle, change.text, change.finished, change.questIndex, change.objectiveIndex, nil, change.objectiveFinished)
                 else
                     LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Progress not sent for " .. (progressTitle or "<nil>") .. "-" .. tostring(change.objectiveIndex) .. " due to sendOnlyFinished setting.")
                 end
+                -- Always broadcast progress update to party, regardless of completion state
+                QPS.Tooltip.BroadcastQuestUpdate(progressTitle, change.text, change.objectiveFinished, change.objectiveIndex, "progress")
                 SyncSavedProgress()
             elseif change.type == "removed" then
                 -- For instantly removed quests, send 'Quest completed' if it matches completedQuestTitle and hasn't already been sent

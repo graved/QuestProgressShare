@@ -31,6 +31,10 @@ If you have any feature requests, please let me know [here](https://github.com/D
 
 ## Changelog
 
+### 1.4.5
+- Fix objective progress coloring by adding per-objective completion status tracking
+- Send party sync progress data regardless of addon config
+
 ### 1.4.4
 - Fix missing final progress messages for completed objectives in multi-objective quests
 
