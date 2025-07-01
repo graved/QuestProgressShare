@@ -1,6 +1,5 @@
 # QuestProgressShare
-This AddOn sends quest progress to other players.
-If you are playing with friends and want to share your quest progress, this AddOn is for you.  
+Automatically syncs quest progress with your party in real time. Designed for smoother and more coordinated group questing without the need for manual updates or chat messages. 
   
 If you encounter any issues or errors, please report them in the [bugtracker](https://github.com/Dreambjorn/QuestProgressShare/issues).
 
@@ -22,14 +21,30 @@ If you have any feature requests, please let me know [here](https://github.com/D
 - `/qps` to open the settings window
 
 ## Features
-- Share quest progress
+- **Share quest progress**
     - with party members
     - with yourself
     - with local chat
-- Share all quest progress or only finished quests
-- Share quest links instead of plain titles (only if pfQuest is enabled)
+- **Share all quest progress or only finished quests**
+- **Share quest links instead of plain titles** *(only if pfQuest is enabled)*
+- **Party progress tooltips** - View party member quest progress by hovering over:
+    - Quest log entries - Display party member progress for the same quest when hovering over quest log titles
+    - Tracker entries - Show party member progress in pfQuest tracker tooltips when available
+    - World objects/mobs - View party progress for quest-related entities when hovering over them in the world
 
 ## Changelog
+
+### 1.5.0
+- Add world object/mob tooltip integration to display party quest progress when hovering over quest-related entities
+- Deduplicate and unify tooltip logic by creating helper functions for class colors and objective processing
+- Unify world object/mob tooltip integration to always use GameTooltip for consistent party progress display
+- Preserve pfQuest integration where required while eliminating unnecessary pfQuest checks in world object/mob tooltips
+- Improve message coloring consistency by using centralized IsObjectiveComplete() helper function
+- Enhance code maintainability by removing redundant logic between quest log/tracker tooltips and world object/mob tooltip systems
+- Update tooltip comments to reflect unified approach with helper functions
+- Refactor debug logging system to support two-tier debugging with normal and verbose modes
+- Add Verbose Debug configuration option that can only be enabled when main debug logging is active
+- Optimize debug output by moving highly detailed logs (table dumps, per-objective traces, string parsing internals) to verbose-only mode
 
 ### 1.4.5
 - Fix objective progress coloring by adding per-objective completion status tracking
