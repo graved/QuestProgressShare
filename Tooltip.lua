@@ -1,5 +1,14 @@
 -- Tooltip.lua: Handles quest progress tooltips and party progress display for QuestProgressShare.
 -- Manages tooltip integration, party sync, and robust display of quest progress for all group members.
+--
+-- TOOLTIP SYSTEM BEHAVIOR:
+-- 1. Quest log and tracker tooltips: Always use PartyTooltip for consistency and to avoid conflicts
+--    - When pfUI is enabled: PartyTooltip is styled to match pfUI appearance
+--    - When pfUI is disabled: PartyTooltip uses clean default styling
+-- 2. World object/mob tooltips: Always use GameTooltip integration for unified display
+--    - Integrates seamlessly with pfQuest, pfUI, or vanilla tooltips
+--    - Uses helper functions for consistent member progress display and coloring
+-- 3. This approach avoids styling conflicts and ensures quest link functionality always works
 
 --------------------------------------------------
 -- GLOBALS & CONSTANTS
@@ -153,25 +162,165 @@ local function IsPartyMemberOnline(name)
     return false
 end
 
--- Returns a set of all current party members (including player)
-local function GetCurrentPartyMembers()
+-- Returns true if pfUI is enabled and available
+local function IsPfUIEnabled()
+    local pfUIEnabled = false
+    if IsAddOnLoaded then
+        pfUIEnabled = IsAddOnLoaded("pfUI") or IsAddOnLoaded("pfUI-turtle")
+    end
+    
+    -- Also check if pfUI objects exist and are functional
+    local pfUIObjectsExist = pfUI and pfUI.api and pfUI.api.CreateBackdrop and type(pfUI.api.CreateBackdrop) == "function"
+    
+    local enabled = pfUIEnabled and pfUIObjectsExist
+    LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] IsPfUIEnabled check: pfUIEnabled=" .. tostring(pfUIEnabled) .. ", pfUIObjectsExist=" .. tostring(pfUIObjectsExist) .. ", enabled=" .. tostring(enabled))
+    return enabled
+end
+
+-- Returns true if pfQuest is enabled and available
+local function IsPfQuestEnabled()
+    -- First check if pfQuest addon is actually enabled in the addon list
+    local pfQuestAddonEnabled = false
+    if IsAddOnLoaded then
+        pfQuestAddonEnabled = IsAddOnLoaded("pfQuest") or IsAddOnLoaded("pfQuest-turtle") or IsAddOnLoaded("pfQuest-tbc") or IsAddOnLoaded("pfQuest-wotlk")
+    end
+    
+    -- If pfUI is loaded but pfQuest is not, we should not use pfQuest tooltips
+    local pfUIEnabled = false
+    if IsAddOnLoaded then
+        pfUIEnabled = IsAddOnLoaded("pfUI") or IsAddOnLoaded("pfUI-turtle")
+    end
+    
+    -- If pfUI is enabled but pfQuest is not, force disable pfQuest functionality
+    if pfUIEnabled and not pfQuestAddonEnabled then
+        LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] pfUI is enabled but pfQuest is disabled, forcing pfQuest functionality OFF")
+        return false
+    end
+    
+    -- Also check if pfQuest objects exist and are functional
+    local pfQuestObjectsExist = pfMap and pfMap.tooltip and type(pfMap.tooltip) == "table" and pfMap.tooltip.GetColor
+    
+    local enabled = pfQuestAddonEnabled and pfQuestObjectsExist
+    LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] IsPfQuestEnabled check: pfQuestAddonEnabled=" .. tostring(pfQuestAddonEnabled) .. ", pfUIEnabled=" .. tostring(pfUIEnabled) .. ", pfQuestObjectsExist=" .. tostring(pfQuestObjectsExist) .. ", enabled=" .. tostring(enabled))
+    return enabled
+end
+
+-- Helper function to get member class color consistently across all tooltip displays
+local function GetMemberClassColor(member)
+    local classColor = "|cffffff00" -- default yellow
+    local class
+    if member == UnitName("player") then
+        class = UnitClass("player")
+    else
+        for i = 1, GetNumPartyMembers() do
+            if UnitName("party"..i) == member then
+                class = UnitClass("party"..i)
+                break
+            end
+        end
+    end
+    
+    -- Safe class color lookup
+    if class then
+        local classToken = StringLib.Upper(class)
+        local c = QPS_CLASS_COLORS and QPS_CLASS_COLORS[classToken]
+        if c and c.r and c.g and c.b then
+            classColor = "|cff"
+                .. StringLib.ByteToHex(math.floor(c.r*255))
+                .. StringLib.ByteToHex(math.floor(c.g*255))
+                .. StringLib.ByteToHex(math.floor(c.b*255))
+        else
+            classColor = "|cffffff00" -- fallback yellow
+        end
+    else
+        classColor = "|cffffff00" -- fallback yellow
+    end
+    
+    return classColor
+end
+
+-- Helper function to process world tooltip objectives for a member
+-- Used to determine completion status and filter objectives relevant to the current entity
+local function ProcessWorldTooltipObjectives(progress, entityName)
+    local allComplete = true
+    local foundAnyObjective = false
+    local relevantObjectives = {}
+    
+    for obj, text in pairs(progress) do
+        if obj ~= "complete" and type(text) == "string" then
+            local trimmedText = StringLib.Gsub(text, "^%s*(.-)%s*$", "%1")
+            if StringLib.Lower(trimmedText) ~= "quest abandoned" then
+                -- Check if this objective is related to the current entity
+                if StringLib.Find(StringLib.Lower(trimmedText), StringLib.Lower(entityName)) then
+                    foundAnyObjective = true
+                    table.insert(relevantObjectives, trimmedText)
+                    
+                    if StringLib.Find(trimmedText, ": ") and StringLib.HasNumberSlashNumber(trimmedText) then
+                        local x, y = StringLib.SafeExtractNumbers(trimmedText)
+                        if not (x and y and tonumber(x) >= tonumber(y)) then
+                            allComplete = false
+                        end
+                    else
+                        allComplete = false
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Check if quest is marked complete
+    if progress.complete then 
+        allComplete = true 
+    end
+    
+    return allComplete, foundAnyObjective, relevantObjectives
+end
+
+-- Helper function to add world tooltip party progress for a member
+-- Unified logic for displaying member progress in world tooltips with proper coloring
+local function AddWorldTooltipMemberProgress(tooltip, member, progress, entityName)
+    if type(progress) ~= "table" then return end
+    
+    -- Get class color for member
+    local classColor = GetMemberClassColor(member)
+    
+    -- Process objectives using helper function
+    local allComplete, foundAnyObjective, relevantObjectives = ProcessWorldTooltipObjectives(progress, entityName)
+    
+    -- Only show members who have relevant objectives for this entity
+    if foundAnyObjective then
+        local line = classColor .. member .. "|r" .. (allComplete and " |cff00ff00(Complete)|r" or "")
+        tooltip:AddLine(line)
+        
+        for _, text in pairs(relevantObjectives) do
+            local color = allComplete and "|cff00ff00" or "|cffff8888"
+            tooltip:AddLine("  - " .. color .. text .. "|r", 1, 1, 1)
+        end
+    end
+end
+
+
+-- Returns a set of all current party members who are online (including player)
+local function GetCurrentOnlinePartyMembers()
     local members = {}
     local playerName = UnitName("player")
     if playerName then members[playerName] = true end
     for i = 1, GetNumPartyMembers() do
         local name = UnitName("party" .. i)
-        if name then members[name] = true end
+        if name and IsPartyMemberOnline(name) then 
+            members[name] = true 
+        end
     end
     local memberList = {}
     for n in pairs(members) do table.insert(memberList, n) end
-    LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] GetCurrentPartyMembers: " .. table.concat(memberList, ", "))
+    LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] GetCurrentOnlinePartyMembers: " .. table.concat(memberList, ", "))
     return members
 end
 
--- Returns a table of party progress for a given quest title, filtered to current party
+-- Returns a table of party progress for a given quest title, filtered to current online party members
 local function GetPartyProgress(questTitle)
     local result = {}
-    local partySet = GetCurrentPartyMembers()
+    local partySet = GetCurrentOnlinePartyMembers()  -- Only show online members
     for sender, quests in pairs(QPS_PartyProgress) do
         if partySet[sender] and quests[questTitle] then
             result[sender] = quests[questTitle]
@@ -194,18 +343,23 @@ end
 -- Hides the party progress tooltip
 local function HidePartyProgressTooltip()
     LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] HidePartyProgressTooltip called, tooltip hidden")
+    -- Hide our custom PartyTooltip
     PartyTooltip:Hide()
     PartyTooltip:SetScript("OnUpdate", nil)
+    -- Clear the party progress added flags for GameTooltip (used by world tooltips)
+    if GameTooltip then
+        GameTooltip.QPS_PartyProgressAdded = nil
+    end
 end
 
 -- Hooks pfQuest tracker buttons to show party progress on hover
 local function HookTrackerButtons(logOnce)
-    if logOnce then LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] HookTrackerButtons called, pfQuest.tracker.buttons: " .. tostring(pfQuest and pfQuest.tracker and pfQuest.tracker.buttons)) end
+    if logOnce then LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] HookTrackerButtons called, IsPfQuestEnabled(): " .. tostring(IsPfQuestEnabled())) end
     local hookedAny = false
-    if pfQuest and pfQuest.tracker and pfQuest.tracker.buttons then
+    if IsPfQuestEnabled() and pfQuest.tracker and pfQuest.tracker.buttons then
         for id, btn in pairs(pfQuest.tracker.buttons) do
             if btn then
-                LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] Examining tracker button id: " .. tostring(id) .. ", btn: " .. tostring(btn) .. ", title: " .. tostring(btn.title))
+                LogVerboseDebugMessage(QPS_DebugLog, "[QPS-DEBUG] Examining tracker button id: " .. tostring(id) .. ", btn: " .. tostring(btn) .. ", title: " .. tostring(btn.title))
             end
             if btn and btn:GetScript("OnEnter") then
                 if not btn.QPS_Hooked then
@@ -227,7 +381,7 @@ local function HookTrackerButtons(logOnce)
             end
         end
     else
-        LogDebugMessage(QPS_DebugLog, "[QPS-WARN] pfQuest.tracker.buttons not available, pfQuest: " .. tostring(pfQuest) .. ", pfQuest.tracker: " .. tostring(pfQuest and pfQuest.tracker))
+        LogDebugMessage(QPS_DebugLog, "[QPS-WARN] pfQuest tracker not available or pfQuest is disabled")
     end
     return hookedAny
 end
@@ -235,12 +389,25 @@ end
 -- Checks for party roster changes and broadcasts progress if needed
 local function CheckPartyChangesAndBroadcast()
     local currentRoster = {}
+    local currentOnlineRoster = {}
     local playerName = UnitName("player")
-    if playerName then currentRoster[playerName] = true end
+    if playerName then 
+        currentRoster[playerName] = true 
+        currentOnlineRoster[playerName] = true
+    end
+    
+    -- Build roster of all party members (online and offline)
     for i = 1, GetNumPartyMembers() do
         local name = UnitName("party"..i)
-        if name then currentRoster[name] = true end
+        if name then 
+            currentRoster[name] = true 
+            if IsPartyMemberOnline(name) then
+                currentOnlineRoster[name] = true
+            end
+        end
     end
+    
+    -- Check for new members or members coming online
     for name in pairs(currentRoster) do
         if not QPS._lastPartyRoster[name] or (not QPS._lastPartyOnline[name] and IsPartyMemberOnline(name)) then
             if name == playerName then
@@ -250,17 +417,33 @@ local function CheckPartyChangesAndBroadcast()
         end
         QPS._lastPartyOnline[name] = IsPartyMemberOnline(name)
     end
+    
+    -- Check for members who left the party
     for name in pairs(QPS._lastPartyRoster) do
         if not currentRoster[name] then
-            LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] CheckPartyChangesAndBroadcast: Party member left or offline: " .. tostring(name))
+            LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] CheckPartyChangesAndBroadcast: Party member left: " .. tostring(name))
             QPS._lastPartyOnline[name] = nil
-            -- Remove party progress data for offline/left member
+            -- Remove party progress data for member who left
             if QPS_PartyProgress[name] then
                 QPS_PartyProgress[name] = nil
-                LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Removed QPS_PartyProgress data for offline/left member: " .. tostring(name))
+                LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Removed QPS_PartyProgress data for member who left: " .. tostring(name))
             end
         end
     end
+    
+    -- Check for members who went offline (but are still in party)
+    for name in pairs(QPS._lastPartyOnline) do
+        if QPS._lastPartyOnline[name] and currentRoster[name] and not currentOnlineRoster[name] then
+            LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] CheckPartyChangesAndBroadcast: Party member went offline: " .. tostring(name))
+            QPS._lastPartyOnline[name] = false
+            -- Remove party progress data for offline member
+            if QPS_PartyProgress[name] then
+                QPS_PartyProgress[name] = nil
+                LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Removed QPS_PartyProgress data for offline member: " .. tostring(name))
+            end
+        end
+    end
+    
     QPS._lastPartyRoster = currentRoster
 end
 
@@ -270,9 +453,9 @@ end
 -- Shows the party progress tooltip for a given quest title
 local function ShowPartyProgressTooltip(anchorFrame, questTitle)
     -- Remove party progress for offline/left members on every hover
-    local currentMembers = GetCurrentPartyMembers()
+    local currentOnlineMembers = GetCurrentOnlinePartyMembers()
     for member in pairs(QPS_PartyProgress) do
-        if not currentMembers[member] and member ~= UnitName("player") then
+        if not currentOnlineMembers[member] and member ~= UnitName("player") then
             QPS_PartyProgress[member] = nil
             LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Hover cleanup: Removed QPS_PartyProgress data for offline/left member: " .. tostring(member))
         end
@@ -300,9 +483,31 @@ local function ShowPartyProgressTooltip(anchorFrame, questTitle)
         LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] ShowPartyProgressTooltip: No party progress for: " .. tostring(questTitle))
         return
     end
+
+    -- Always use PartyTooltip for quest log/tracker tooltips for consistency
+    LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] ShowPartyProgressTooltip: Using PartyTooltip" .. (IsPfUIEnabled() and " with pfUI styling" or " (clean style)"))
     PartyTooltip:ClearLines()
     PartyTooltip:SetOwner(UIParent, "ANCHOR_NONE")
     PartyTooltip:ClearAllPoints()
+    
+    -- Apply pfUI styling if available
+    if IsPfUIEnabled() then
+        LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] Applying pfUI styling to PartyTooltip")
+        
+        -- Apply pfUI's backdrop styling to make PartyTooltip match pfUI's appearance
+        local alpha = pfUI_config and pfUI_config.tooltip and pfUI_config.tooltip.alpha and tonumber(pfUI_config.tooltip.alpha) or 0.9
+        
+        -- Only apply styling if not already applied
+        if not PartyTooltip.pfui_styled then
+            pfUI.api.CreateBackdrop(PartyTooltip, nil, nil, alpha)
+            if pfUI.api.CreateBackdropShadow then
+                pfUI.api.CreateBackdropShadow(PartyTooltip)
+            end
+            PartyTooltip.pfui_styled = true
+            LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] Successfully applied pfUI styling to PartyTooltip")
+        end
+    end
+    
     -- Initial position, will be updated by OnUpdate
     local x, y = GetCursorPosition()
     local scale = UIParent:GetEffectiveScale()
@@ -310,39 +515,14 @@ local function ShowPartyProgressTooltip(anchorFrame, questTitle)
     y = y / scale
     PartyTooltip:SetPoint("RIGHT", UIParent, "BOTTOMLEFT", x - 20, y)
     PartyTooltip:AddLine("|cffb48affParty Progress:|r")
+    
     for member, progress in pairs(partyProgress) do
         if type(progress) ~= "table" then
             LogDebugMessage(QPS_EventDebugLog, "[QPS-WARN] ShowPartyProgressTooltip: Skipping member " .. tostring(member) .. " because progress is not a table: " .. tostring(progress))
         end
         if type(progress) == "table" then
             -- Get class color for member
-            local classColor = "|cffffff00" -- default yellow
-            local class
-            if member == UnitName("player") then
-                class = UnitClass("player")
-            else
-                for i = 1, GetNumPartyMembers() do
-                    if UnitName("party"..i) == member then
-                        class = UnitClass("party"..i)
-                        break
-                    end
-                end
-            end
-            -- Safe class color lookup
-            if class then
-                local classToken = StringLib.Upper(class)
-                local c = QPS_CLASS_COLORS and QPS_CLASS_COLORS[classToken]
-                if c and c.r and c.g and c.b then
-                    classColor = "|cff"
-                        .. StringLib.ByteToHex(math.floor(c.r*255))
-                        .. StringLib.ByteToHex(math.floor(c.g*255))
-                        .. StringLib.ByteToHex(math.floor(c.b*255))
-                else
-                    classColor = "|cffffff00" -- fallback yellow
-                end
-            else
-                classColor = "|cffffff00" -- fallback yellow
-            end
+            local classColor = GetMemberClassColor(member)
             -- Determine if all objectives are complete for this member
             local allComplete = true
             local foundAnyObjective = false
@@ -356,14 +536,6 @@ local function ShowPartyProgressTooltip(anchorFrame, questTitle)
                     else
                         if StringLib.Find(trimmedText, ": ") and StringLib.HasNumberSlashNumber(trimmedText) then
                             foundAnyObjective = true
-                            -- Log byte values for debugging
-                            if QPS_DebugLog then
-                                local bytes = {}
-                                for i = 1, StringLib.Len(trimmedText) do
-                                    table.insert(bytes, StringLib.Byte(trimmedText, i))
-                                end
-                                LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] Bytes for '" .. tostring(trimmedText) .. "': " .. table.concat(bytes, ","))
-                            end
                             -- Extract numbers for progress
                             local x, y = nil, nil
                             if StringLib.HasNumberSlashNumber(trimmedText) then
@@ -373,23 +545,23 @@ local function ShowPartyProgressTooltip(anchorFrame, questTitle)
                             if x and y then
                                 x = tonumber(x)
                                 y = tonumber(y)
-                                LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Extracted numbers for objective: x=" .. tostring(x) .. ", y=" .. tostring(y))
+                                LogVerboseDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Extracted numbers for objective: x=" .. tostring(x) .. ", y=" .. tostring(y))
                                 if x < y then
                                     colorText = "|cffff4040" .. trimmedText .. "|r" -- red if not done
                                     allComplete = false
-                                    LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Objective not complete: x < y for '" .. tostring(trimmedText) .. "'")
+                                    LogVerboseDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Objective not complete: x < y for '" .. tostring(trimmedText) .. "'")
                                 else
                                     colorText = "|cff40ff40" .. trimmedText .. "|r" -- green if done or over
-                                    LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Objective complete: x >= y for '" .. tostring(trimmedText) .. "'")
+                                    LogVerboseDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Objective complete: x >= y for '" .. tostring(trimmedText) .. "'")
                                 end
                             else
                                 allComplete = false
-                                LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Could not extract numbers for objective: '" .. tostring(trimmedText) .. "'")
+                                LogVerboseDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Could not extract numbers for objective: '" .. tostring(trimmedText) .. "'")
                             end
-                            LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Matched objective for " .. tostring(member) .. ": " .. tostring(trimmedText))
+                            LogVerboseDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Matched objective for " .. tostring(member) .. ": " .. tostring(trimmedText))
                             table.insert(matchingObjectives, colorText)
                         else
-                            LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Skipped non-objective: " .. tostring(trimmedText))
+                            LogVerboseDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Skipped non-objective: " .. tostring(trimmedText))
                         end
                     end
                 end
@@ -406,6 +578,7 @@ local function ShowPartyProgressTooltip(anchorFrame, questTitle)
             end
         end
     end
+    
     PartyTooltip:Show()
     PartyTooltip:SetScript("OnUpdate", PartyTooltipOnUpdate)
 end
@@ -416,12 +589,23 @@ end
 -- pfQuest tracker button hover handlers
 function TrackerButtonOnEnter()
     local btn = this
-    if btn and btn.title then
-        ShowPartyProgressTooltip(btn, btn.title)
+    if btn then
+        -- Call the original pfQuest handler first if it exists (only if pfQuest is enabled)
+        if IsPfQuestEnabled() and btn.QPS_OrigEnter then
+            btn.QPS_OrigEnter()
+        end
+        -- Then add our party progress (always uses PartyTooltip, styled for pfQuest when enabled)
+        if btn.title then
+            ShowPartyProgressTooltip(btn, btn.title)
+        end
     end
 end
 
 function TrackerButtonOnLeave()
+    local btn = this
+    if btn and btn.QPS_OrigLeave then
+        btn.QPS_OrigLeave()
+    end
     HidePartyProgressTooltip()
 end
 
@@ -470,15 +654,15 @@ local function HookQuestLogOnShow()
     end
 end
 
--- Hooks pfQuest tracker if available
+-- Hooks pfQuest tracker if available and enabled
 local function SafeHookPfQuestTracker(logOnce)
-    if pfQuest and pfQuest.tracker and pfQuest.tracker.buttons then
+    if IsPfQuestEnabled() and pfQuest.tracker and pfQuest.tracker.buttons then
         return HookTrackerButtons(logOnce)
     end
     return false
 end
 
--- Initial hook on login and periodically
+-- Initial hook on login
 local QuestLogHookFrame = CreateFrame("Frame")
 QuestLogHookFrame:RegisterEvent("PLAYER_LOGIN")
 QuestLogHookFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
@@ -513,7 +697,7 @@ if not QPS._partyProgressEventsHooked then
         if (event == "PLAYER_ENTERING_WORLD") then
             local partyCount = GetNumPartyMembers()
             local currentEvent = event or arg1 or "?"
-            if QPS_DebugLog then LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Event: " .. tostring(currentEvent) .. ", party members: " .. tostring(partyCount)) end
+            LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Event: " .. tostring(currentEvent) .. ", party members: " .. tostring(partyCount))
             if partyCount > 0 then
                 QPS_PartyProgress = {}
                 RequestPartySync()
@@ -522,7 +706,7 @@ if not QPS._partyProgressEventsHooked then
         elseif (event == "PARTY_MEMBERS_CHANGED") then
             local partyCount = GetNumPartyMembers()
             local currentEvent = event or arg1 or "?"
-            if QPS_DebugLog then LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Event: " .. tostring(currentEvent) .. ", party members: " .. tostring(partyCount)) end
+            LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Event: " .. tostring(currentEvent) .. ", party members: " .. tostring(partyCount))
             if partyCount > 0 then
                 RequestPartySync()
                 QPS.Tooltip.BroadcastPartyProgress()
@@ -575,7 +759,7 @@ if not QPS._partyProgressAddonListener then
                 -- Ignore our own progress messages to avoid polluting QPS_PartyProgress
                 if sender == UnitName("player") then return end
                 local parts = StringLib.Split(message, ":::")
-                LogDebugMessage(QPS_SyncDebugLog, "[QPS-DEBUG] Split message parts: " .. table.concat(parts, ", "))
+                LogVerboseDebugMessage(QPS_SyncDebugLog, "[QPS-DEBUG] Split message parts: " .. table.concat(parts, ", "))
                 local quest, objIdx, text, finished, progressOwner = parts[1], parts[2], parts[3], parts[4], parts[5]
                 if not quest or not text then
                     LogDebugMessage(QPS_EventDebugLog, "[QPS-WARN] Skipping message: missing quest or text.")
@@ -587,29 +771,246 @@ if not QPS._partyProgressAddonListener then
                 if finished ~= 0 and finished ~= 1 then
                     LogDebugMessage(QPS_EventDebugLog, "[QPS-ERROR] Invalid 'finished' value received: '" .. tostring(finished) .. "' for quest '" .. tostring(quest) .. "' from '" .. tostring(sender) .. "'")
                 end
-                LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Storing progress: progressOwner='" .. tostring(progressOwner) .. "', quest='" .. tostring(quest) .. "', objIdx='" .. tostring(objIdx) .. "', text='" .. tostring(text) .. "', finished='" .. tostring(finished) .. "'")
+                LogVerboseDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Storing progress: progressOwner='" .. tostring(progressOwner) .. "', quest='" .. tostring(quest) .. "', objIdx='" .. tostring(objIdx) .. "', text='" .. tostring(text) .. "', finished='" .. tostring(finished) .. "'")
                 QPS_PartyProgress[progressOwner] = QPS_PartyProgress[progressOwner] or {}
                 QPS_PartyProgress[progressOwner][quest] = QPS_PartyProgress[progressOwner][quest] or {}
                 QPS_PartyProgress[progressOwner][quest][objIdx] = text
                 QPS_PartyProgress[progressOwner][quest].complete = (finished == 1)
                 LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] Received quest progress: progressOwner='" .. tostring(progressOwner) .. "', quest='" .. tostring(quest) .. "', objIdx='" .. tostring(objIdx) .. "', text='" .. tostring(text) .. "', finished='" .. tostring(finished) .. "'")
-                if QPS_DebugLog then
-                    local dump = "[QPS-DEBUG] QPS_PartyProgress now: "
-                    for member, quests in pairs(QPS_PartyProgress) do
-                        dump = dump .. member .. "={"
-                        for q, objs in pairs(quests) do
-                            dump = dump .. q .. ":["
-                            for o, v in pairs(objs) do
-                                dump = dump .. tostring(o) .. "=" .. tostring(v) .. ","
-                            end
-                            dump = dump .. "] "
+                local dump = "[QPS-DEBUG] QPS_PartyProgress now: "
+                for member, quests in pairs(QPS_PartyProgress) do
+                    dump = dump .. member .. "={"
+                    for q, objs in pairs(quests) do
+                        dump = dump .. q .. ":["
+                        for o, v in pairs(objs) do
+                            dump = dump .. tostring(o) .. "=" .. tostring(v) .. ","
                         end
-                        dump = dump .. "} "
+                        dump = dump .. "] "
                     end
-                    LogDebugMessage(QPS_DebugLog, dump)
+                    dump = dump .. "} "
                 end
+                LogVerboseDebugMessage(QPS_DebugLog, dump)
             end
         end
     end)
     QPS._partyProgressAddonListener = true
+end
+
+--------------------------------------------------
+-- WORLD OBJECT/MOB TOOLTIP INTEGRATION
+--------------------------------------------------
+
+-- Checks if a mob/object name is related to any quest that both player and party have
+local function GetQuestRelatedToMobOrObject(entityName)
+    if not entityName or entityName == "" then return nil end
+    
+    -- Get player's current quests and check which ones have objectives mentioning this entity
+    local playerQuestsByEntity = {}
+    for qid = 1, GetNumQuestLogEntries() do
+        local qtitle, _, _, _, _, _ = GetQuestLogTitle(qid)
+        if qtitle then
+            local objectives = GetNumQuestLeaderBoards and GetNumQuestLeaderBoards(qid)
+            if objectives then
+                for i = 1, objectives do
+                    local text, type, finished = GetQuestLogLeaderBoard and GetQuestLogLeaderBoard(i, qid)
+                    if text then
+                        -- Check if this objective mentions the entity
+                        -- Look for exact name matches and partial matches
+                        local objectiveText = StringLib.Lower(text)
+                        local entityLower = StringLib.Lower(entityName)
+                        
+                        if StringLib.Find(objectiveText, entityLower) then
+                            playerQuestsByEntity[qtitle] = true
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Check if any online party member has progress for quests that involve this entity
+    local partyMembers = GetCurrentOnlinePartyMembers()
+    local relatedQuests = {}
+    
+    for member, quests in pairs(QPS_PartyProgress) do
+        if partyMembers[member] then
+            for questTitle, progress in pairs(quests) do
+                if playerQuestsByEntity[questTitle] and type(progress) == "table" then
+                    relatedQuests[questTitle] = true
+                end
+            end
+        end
+    end
+    
+    -- Return the first related quest found
+    for questTitle in pairs(relatedQuests) do
+        return questTitle
+    end
+    
+    return nil
+end
+
+-- Shows party progress tooltip for world objects/mobs
+local function ShowWorldTooltipPartyProgress(entityName)
+    -- Remove party progress for offline/left members on every hover
+    local currentOnlineMembers = GetCurrentOnlinePartyMembers()
+    for member in pairs(QPS_PartyProgress) do
+        if not currentOnlineMembers[member] and member ~= UnitName("player") then
+            QPS_PartyProgress[member] = nil
+            LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] World tooltip cleanup: Removed QPS_PartyProgress data for offline/left member: " .. tostring(member))
+        end
+    end
+    
+    local relatedQuest = GetQuestRelatedToMobOrObject(entityName)
+    if not relatedQuest then
+        return
+    end
+    
+    -- Only show if there is at least one other party member
+    if (GetNumPartyMembers and GetNumPartyMembers() == 0) then
+        LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] Not showing world tooltip party progress: no party members.")
+        return
+    end
+    
+    local partyProgress = QPS.Tooltip.GetPartyProgress(relatedQuest)
+    if not partyProgress or not next(partyProgress) then
+        return
+    end
+    
+    -- Always use GameTooltip integration for world tooltips - unified approach for all addon combinations
+    local tooltip = GameTooltip
+    LogDebugMessage(QPS_EventDebugLog, "[QPS-DEBUG] ShowWorldTooltipPartyProgress: Using GameTooltip integration")
+    
+    -- Check if we've already added party progress to this tooltip
+    if not tooltip.QPS_PartyProgressAdded then
+        -- Add party progress to existing GameTooltip (may be styled by pfUI/pfQuest)
+        tooltip:AddLine(" ") -- Spacer
+        tooltip:AddLine("|cffb48affParty Progress:|r")
+        tooltip.QPS_PartyProgressAdded = true
+    else
+        -- Party progress already added, skip
+        return
+    end
+    
+    for member, progress in pairs(partyProgress) do
+        AddWorldTooltipMemberProgress(tooltip, member, progress, entityName)
+    end
+    
+    tooltip:Show()
+end
+
+-- Hook into world tooltips for mobs and objects using unified GameTooltip integration
+if not QPS._worldTooltipHooked then
+    -- Always hook GameTooltip OnShow for world objects/mobs
+    -- Uses unified display logic with helper functions for consistent behavior
+    local originalOnShow = GameTooltip:GetScript("OnShow")
+    GameTooltip:SetScript("OnShow", function()
+        -- Call original handler first (this may include pfUI styling)
+        if originalOnShow then
+            originalOnShow()
+        end
+        
+        -- Skip if this is a pfQuest node or quest timer
+        local focus = GetMouseFocus()
+        if focus and focus.title then return end
+        if focus and focus.GetName and StringLib.Sub((focus:GetName() or ""),0,10) == "QuestTimer" then return end
+        
+        -- Get the entity name from the tooltip
+        local entityName = getglobal("GameTooltipTextLeft1") and getglobal("GameTooltipTextLeft1"):GetText() or nil
+        if entityName then
+            -- Remove color codes
+            entityName = StringLib.Gsub(entityName, "|c%x%x%x%x%x%x%x%x", "")
+            entityName = StringLib.Gsub(entityName, "|r", "")
+            
+            LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] World tooltip hook: Using GameTooltip for entity '" .. tostring(entityName) .. "', pfQuest enabled: " .. tostring(IsPfQuestEnabled()))
+            ShowWorldTooltipPartyProgress(entityName)
+        end
+    end)
+    
+    -- Hook GameTooltip OnHide to hide our PartyTooltip when the main tooltip disappears
+    local originalOnHide = GameTooltip:GetScript("OnHide")
+    GameTooltip:SetScript("OnHide", function()
+        -- Call original handler first
+        if originalOnHide then
+            originalOnHide()
+        end
+        
+        -- Hide our PartyTooltip when GameTooltip hides
+        HidePartyProgressTooltip()
+        LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] GameTooltip OnHide: Hiding PartyTooltip")
+    end)
+    
+    -- Only hook pfQuest tooltip if pfQuest is actually enabled (not just pfUI)
+    local function TryHookPfQuestTooltip()
+        if IsPfQuestEnabled() and pfMap and pfMap.tooltip then
+            local originalPfShow = pfMap.tooltip:GetScript("OnShow")
+            pfMap.tooltip:SetScript("OnShow", function()
+                -- Call original handler first
+                if originalPfShow then
+                    originalPfShow()
+                end
+                
+                -- Skip if this is a pfQuest node or quest timer
+                local focus = GetMouseFocus()
+                if focus and focus.title then return end
+                if focus and focus.GetName and StringLib.Sub((focus:GetName() or ""),0,10) == "QuestTimer" then return end
+                
+                -- Get the entity name from the tooltip
+                local entityName = getglobal("pfQuestTooltipTextLeft1") and getglobal("pfQuestTooltipTextLeft1"):GetText() or 
+                                   getglobal("GameTooltipTextLeft1") and getglobal("GameTooltipTextLeft1"):GetText() or nil
+                if entityName then
+                    -- Remove color codes
+                    entityName = StringLib.Gsub(entityName, "|c%x%x%x%x%x%x%x%x", "")
+                    entityName = StringLib.Gsub(entityName, "|r", "")
+                    
+                    ShowWorldTooltipPartyProgress(entityName)
+                end
+            end)
+            
+            -- Also hook pfQuest tooltip OnHide to clean up party progress flags
+            local originalPfHide = pfMap.tooltip:GetScript("OnHide")
+            pfMap.tooltip:SetScript("OnHide", function()
+                -- Call original handler first
+                if originalPfHide then
+                    originalPfHide()
+                end
+                
+                -- Clear party progress flags when pfQuest tooltip hides
+                if GameTooltip then
+                    GameTooltip.QPS_PartyProgressAdded = nil
+                end
+                LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] pfQuest tooltip OnHide: Cleared party progress flags")
+            end)
+            
+            LogDebugMessage(QPS_DebugLog, "[QPS-INFO] Successfully hooked pfQuest world tooltip system")
+            return true
+        else
+            LogDebugMessage(QPS_DebugLog, "[QPS-DEBUG] Skipping pfQuest tooltip hook - pfQuest not enabled or pfMap.tooltip not available")
+            return false
+        end
+    end
+    
+    -- Only try to hook pfQuest tooltip if pfQuest is actually enabled
+    if IsPfQuestEnabled() then
+        if not TryHookPfQuestTooltip() then
+            local retryFrame = CreateFrame("Frame")
+            retryFrame._qps_lastRetry = time()
+            retryFrame:SetScript("OnUpdate", function()
+                local now = time()
+                if (now - retryFrame._qps_lastRetry) >= 2 then
+                    if TryHookPfQuestTooltip() then
+                        retryFrame:SetScript("OnUpdate", nil)
+                    else
+                        retryFrame._qps_lastRetry = now
+                    end
+                end
+            end)
+        end
+    else
+        LogDebugMessage(QPS_DebugLog, "[QPS-INFO] Skipping pfQuest tooltip hook setup - pfQuest not enabled")
+    end
+    
+    QPS._worldTooltipHooked = true
+    LogDebugMessage(QPS_DebugLog, "[QPS-INFO] Successfully hooked world tooltip systems - unified GameTooltip integration with helper functions")
 end

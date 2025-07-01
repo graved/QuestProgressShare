@@ -57,9 +57,7 @@ function SanitizeAddonMessage(title, text)
     local safeText = ExtractProgress(text)
     if StringLib.Find(safeTitle, "|") then safeTitle = StringLib.Gsub(safeTitle, "|", "") end
     if StringLib.Find(safeText, "|") then safeText = StringLib.Gsub(safeText, "|", "") end
-    if QPS_DebugLog then
-        table.insert(QPS_DebugLog, "SanitizeAddonMessage: title_before='"..tostring(title).."' title_after='"..tostring(safeTitle).."' text_before='"..tostring(text).."' text_after='"..tostring(safeText).."'")
-    end
+    LogVerboseDebugMessage(QPS_DebugLog, "SanitizeAddonMessage: title_before='"..tostring(title).."' title_after='"..tostring(safeTitle).."' text_before='"..tostring(text).."' text_after='"..tostring(safeText).."'")
     return safeTitle, safeText
 end
 

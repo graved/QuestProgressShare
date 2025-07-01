@@ -240,7 +240,7 @@ function StringLib.HasNumberSlashNumber(s)
                 if k <= len then
                     local c3 = StringLib.Byte(s, k)
                     if c3 and c3 >= 48 and c3 <= 57 then
-                        LogDebugMessage("[QPS-DEBUG] HasNumberSlashNumber: matched in '"..tostring(s).."'")
+                        LogVerboseDebugMessage(QPS_DebugLog, "[QPS-DEBUG] HasNumberSlashNumber: matched in '"..tostring(s).."'")
                         return true
                     end
                 end
@@ -248,7 +248,7 @@ function StringLib.HasNumberSlashNumber(s)
         end
         i = i + 1
     end
-    LogDebugMessage("[QPS-DEBUG] HasNumberSlashNumber: no match in '"..tostring(s).."'")
+    LogVerboseDebugMessage(QPS_DebugLog, "[QPS-DEBUG] HasNumberSlashNumber: no match in '"..tostring(s).."'")
     return false
 end
 
@@ -280,7 +280,7 @@ function StringLib.ExtractQuestAndObjIdx(key)
     -- Extracts the quest name and objective index from a key formatted as 'questName-idx'. Returns quest name and objective index as strings, or nil, nil if not valid.
     -- Returns quest name and objective index as strings, or nil, nil if not valid.
     if type(key) ~= "string" then
-        LogDebugMessage("[QPS-DEBUG] ExtractQuestAndObjIdx: key is not a string: " .. tostring(key))
+        LogVerboseDebugMessage(QPS_DebugLog, "[QPS-DEBUG] ExtractQuestAndObjIdx: key is not a string: " .. tostring(key))
         return nil, nil
     end
     local len = StringLib.Len(key)
@@ -293,7 +293,7 @@ function StringLib.ExtractQuestAndObjIdx(key)
         end
     end
     if not dashPos then
-        LogDebugMessage("[QPS-DEBUG] ExtractQuestAndObjIdx: no dash found in key: " .. tostring(key))
+        LogVerboseDebugMessage(QPS_DebugLog, "[QPS-DEBUG] ExtractQuestAndObjIdx: no dash found in key: " .. tostring(key))
         return nil, nil
     end
     local quest = StringLib.Sub(key, 1, dashPos - 1)
@@ -305,9 +305,9 @@ function StringLib.ExtractQuestAndObjIdx(key)
         if b < 48 or b > 57 then isDigits = false break end
     end
     if not isDigits then
-        LogDebugMessage("[QPS-WARN] ExtractQuestAndObjIdx: objIdx is not all digits: " .. tostring(objIdxStr) .. " in key: " .. tostring(key))
+        LogVerboseDebugMessage(QPS_DebugLog, "[QPS-WARN] ExtractQuestAndObjIdx: objIdx is not all digits: " .. tostring(objIdxStr) .. " in key: " .. tostring(key))
         return nil, nil
     end
-    LogDebugMessage(string.format("[QPS-DEBUG] ExtractQuestAndObjIdx: key='%s', quest='%s', objIdx='%s'", tostring(key), tostring(quest), tostring(objIdxStr)))
+    LogVerboseDebugMessage(QPS_DebugLog, string.format("[QPS-DEBUG] ExtractQuestAndObjIdx: key='%s', quest='%s', objIdx='%s'", tostring(key), tostring(quest), tostring(objIdxStr)))
     return quest, objIdxStr
 end

@@ -2,8 +2,8 @@
 ## Title: Quest Progress Share
 ## Notes: Sends a message to the party when you complete a quest.
 ## Author: GraveD89, Dreambjorn
-## Version: 1.4.5
-## OptionalDeps: pfQuest
+## Version: 1.5.0
+## OptionalDeps: pfQuest, pfUI
 ## SavedVariables: QPS_DebugLog, QPS_CoreDebugLog, QPS_EventDebugLog, QPS_ProgressDebugLog, QPS_SyncDebugLog, QPS_ConfigDebugLog
 ## SavedVariablesPerCharacter: QPS_SavedKnownQuests, QPS_SavedProgress, QuestProgressShareConfig, QPS_SavedLoadCount
 

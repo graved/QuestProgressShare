@@ -35,6 +35,9 @@ function QPS.config.SetDefaultConfigValues()
     if QuestProgressShareConfig.debugEnabled == nil then
         QuestProgressShareConfig.debugEnabled = false
     end
+    if QuestProgressShareConfig.verboseDebugEnabled == nil then
+        QuestProgressShareConfig.verboseDebugEnabled = false
+    end
     if QuestProgressShareConfig.sendAbandoned == nil then
         QuestProgressShareConfig.sendAbandoned = false
     end
@@ -43,15 +46,24 @@ end
 -- Create the config frame
 QPS.configFrame = CreateFrame("Frame", "QuestProgressShareConfigFrame", UIParent)
 QPS.configFrame:SetWidth(300)
-QPS.configFrame:SetHeight(340)
+QPS.configFrame:SetHeight(350)
 QPS.configFrame:SetPoint("CENTER", 0, 0)
-QPS.configFrame:SetBackdrop({
-    bgFile = "Interface/Tooltips/UI-Tooltip-Background",
-    edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
-    tile = true, tileSize = 16, edgeSize = 16,
-    insets = { left = 4, right = 4, top = 4, bottom = 4 }
-})
-QPS.configFrame:SetBackdropColor(0, 0, 0, 1)
+
+-- Apply pfUI styling if pfUI is available, otherwise use default styling
+if pfUI and pfUI.api and pfUI.api.CreateBackdrop then
+    -- Use pfUI styling
+    pfUI.api.CreateBackdrop(QPS.configFrame, nil, true, 0.8)
+else
+    -- Use default WoW styling
+    QPS.configFrame:SetBackdrop({
+        bgFile = "Interface/Tooltips/UI-Tooltip-Background",
+        edgeFile = "Interface/Tooltips/UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 16,
+        insets = { left = 4, right = 4, top = 4, bottom = 4 }
+    })
+    QPS.configFrame:SetBackdropColor(0, 0, 0, 1)
+end
+
 QPS.configFrame:SetMovable(true)
 QPS.configFrame:EnableMouse(true)
 QPS.configFrame:Hide()
@@ -166,11 +178,39 @@ checkboxDebugEnabled:SetPoint("TOPLEFT", 20, -250)
 checkboxDebugEnabled:SetChecked(QuestProgressShareConfig.debugEnabled)
 checkboxDebugEnabled:SetScript("OnClick", function()
     QuestProgressShareConfig.debugEnabled = checkboxDebugEnabled:GetChecked()
+    -- Update verbose debug checkbox state when debug is toggled
+    UpdateVerboseDebugState()
 end)
 
 local labelDebugEnabled = QPS.configFrame:CreateFontString("QuestProgressShareConfigDebugEnabledLabel", "OVERLAY", "GameFontNormal")
 labelDebugEnabled:SetPoint("LEFT", checkboxDebugEnabled, "RIGHT", 10, 0)
 labelDebugEnabled:SetText("Enable debug logging")
+
+-- Checkbox for verbose debug output
+local checkboxVerboseDebugEnabled = CreateFrame("CheckButton", "QuestProgressShareConfigVerboseDebugEnabledCheckbox", QPS.configFrame, "UICheckButtonTemplate")
+checkboxVerboseDebugEnabled:SetPoint("TOPLEFT", 40, -280)
+checkboxVerboseDebugEnabled:SetChecked(QuestProgressShareConfig.verboseDebugEnabled)
+checkboxVerboseDebugEnabled:SetScript("OnClick", function()
+    QuestProgressShareConfig.verboseDebugEnabled = checkboxVerboseDebugEnabled:GetChecked()
+end)
+
+local labelVerboseDebugEnabled = QPS.configFrame:CreateFontString("QuestProgressShareConfigVerboseDebugEnabledLabel", "OVERLAY", "GameFontNormal")
+labelVerboseDebugEnabled:SetPoint("LEFT", checkboxVerboseDebugEnabled, "RIGHT", 10, 0)
+labelVerboseDebugEnabled:SetText("Enable verbose debug logging")
+
+-- Function to update verbose debug checkbox state based on debug enabled
+function UpdateVerboseDebugState()
+    local isDebugEnabled = QuestProgressShareConfig.debugEnabled
+    if isDebugEnabled then
+        checkboxVerboseDebugEnabled:Enable()
+        labelVerboseDebugEnabled:SetTextColor(1, 0.82, 0) -- Yellow text when enabled and debug is on (same as other labels)
+    else
+        checkboxVerboseDebugEnabled:Disable()
+        checkboxVerboseDebugEnabled:SetChecked(false)
+        QuestProgressShareConfig.verboseDebugEnabled = false
+        labelVerboseDebugEnabled:SetTextColor(0.5, 0.5, 0.5) -- Gray text when disabled
+    end
+end
 
 -- Update the config options when the frame is shown
 QPS.configFrame:SetScript("OnShow", function()
@@ -187,14 +227,23 @@ function UpdateConfigFrame()
     checkboxSendStartingQuests:SetChecked(QuestProgressShareConfig.sendStartingQuests)
     checkboxSendAbandoned:SetChecked(QuestProgressShareConfig.sendAbandoned)
     checkboxDebugEnabled:SetChecked(QuestProgressShareConfig.debugEnabled)
+    checkboxVerboseDebugEnabled:SetChecked(QuestProgressShareConfig.verboseDebugEnabled)
+    -- Update verbose debug state based on debug enabled
+    UpdateVerboseDebugState()
 end
 
 -- Creates and configures the Close button for the config frame.
 local closeButton = CreateFrame("Button", nil, QPS.configFrame, "UIPanelButtonTemplate")
 closeButton:SetWidth(80)
 closeButton:SetHeight(22)
-closeButton:SetPoint("BOTTOM", 0, 20)
+closeButton:SetPoint("BOTTOM", 0, 10)
 closeButton:SetText("Close")
+
+-- Apply pfUI styling to the close button if pfUI is available
+if pfUI and pfUI.api and pfUI.api.SkinButton then
+    pfUI.api.SkinButton(closeButton)
+end
+
 closeButton:SetScript("OnClick", function()    
     QPS.configFrame:Hide()
     -- ReloadUI()
