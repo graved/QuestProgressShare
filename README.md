@@ -34,6 +34,9 @@ If you have any feature requests, please let me know [here](https://github.com/D
 
 ## Changelog
 
+### 1.5.1
+- Increase startup delay to 6s
+
 ### 1.5.0
 - Add world object/mob tooltip integration to display party quest progress when hovering over quest-related entities
 - Deduplicate and unify tooltip logic by creating helper functions for class colors and objective processing
