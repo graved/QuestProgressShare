@@ -862,7 +862,7 @@ function OnEvent()
         QPS.delayFrame.startTime = time()
         QPS.delayFrame:SetScript("OnUpdate", function()
             local now = time()
-            if (now - QPS.delayFrame.startTime) >= 3 then
+            if (now - QPS.delayFrame.startTime) >= 6 then
                 QPS.ready = true
                 QPS.delayFrame:SetScript("OnUpdate", nil)
 
