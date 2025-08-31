@@ -14,7 +14,7 @@ If you have any feature requests, please let me know [here](https://github.com/D
 
 ### II. Automatic Installation
 
-1. Go to the Addons tab in the Turtle WoW Launcher
+1. Go to the Addons tab in the Launcher
 2. Use the "Add new addon" button and enter the [repository link](https://github.com/Dreambjorn/QuestProgressShare.git) to install the addon
 
 ## Usage
