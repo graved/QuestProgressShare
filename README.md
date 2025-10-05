@@ -1,21 +1,24 @@
 # QuestProgressShare
 Automatically syncs quest progress with your party in real time. Designed for smoother and more coordinated group questing without the need for manual updates or chat messages. 
   
-If you encounter any issues or errors, please report them in the [bugtracker](https://github.com/Dreambjorn/QuestProgressShare/issues).
+If you encounter any issues or errors, please report them in the [bugtracker](https://github.com/graved/QuestProgressShare/issues).
 
-If you have any feature requests, please let me know [here](https://github.com/Dreambjorn/QuestProgressShare/issues).
+If you have any feature requests, please let me know [here](https://github.com/graved/QuestProgressShare/issues).
+
+## Acknowledgments
+Special thanks to Dreambjorn for continuing and evolving the original addon.
 
 ## Installation
 
 ### I. Manual Installation
 
-1. Download the latest version from the [releases page](https://github.com/Dreambjorn/QuestProgressShare/releases)
+1. Download the latest version from the [releases page](https://github.com/graved/QuestProgressShare/releases)
 2. Extract the archive and copy the `QuestProgressShare` folder to your `Interface/AddOns` folder
 
 ### II. Automatic Installation
 
 1. Go to the Addons tab in the Launcher
-2. Use the "Add new addon" button and enter the [repository link](https://github.com/Dreambjorn/QuestProgressShare.git) to install the addon
+2. Use the "Add new addon" button and enter the [repository link](https://github.com/graved/QuestProgressShare.git) to install the addon
 
 ## Usage
 - `/qps` to open the settings window
@@ -70,11 +73,11 @@ If you have any feature requests, please let me know [here](https://github.com/D
 - Implement live party sync so quest progress is always up to date for everyone
 - Refactor core logic for clarity, maintainability, and robustness
 - Improve and unify debug logging for easier tracking and troubleshooting
-- Move string helper functions to [QuestStringHelpers.lua](https://github.com/Dreambjorn/QuestProgressShare/blob/main/util/QuestStringHelpers.lua) for better organization
+- Move string helper functions to [QuestStringHelpers.lua](https://github.com/graved/QuestProgressShare/blob/main/util/QuestStringHelpers.lua) for better organization
 - Add option to broadcast abandoned quests to your party (disabled by default, can be enabled in settings)
 - Improve handling of party member join/leave, quest completion, and quest abandonment for accurate progress display and cleanup
 - Enhance tooltip logic to robustly handle edge cases and only show current party members’ progress
-- Remove redundant logic between [Core.lua](https://github.com/Dreambjorn/QuestProgressShare/blob/main/Core.lua) and [Tooltip.lua](https://github.com/Dreambjorn/QuestProgressShare/blob/main/Tooltip.lua)
+- Remove redundant logic between [Core.lua](https://github.com/graved/QuestProgressShare/blob/main/Core.lua) and [Tooltip.lua](https://github.com/graved/QuestProgressShare/blob/main/Tooltip.lua)
 - Fix issues with party progress not updating correctly when members join, leave, or reconnect
 - Fix rare cases where tooltips could show outdated or incorrect progress
 - Fix color-coding inconsistencies for certain classes and completion states
