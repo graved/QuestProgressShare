@@ -62,8 +62,11 @@ function QPS.chatMessage.Send(title, text, finished, objectiveIndex, objectiveFi
         ChatThrottleLib:SendChatMessage("NORMAL", "QPS", message, "SAY")
     end
     
-    -- Send the message to the party chat
-    if (QuestProgressShareConfig.sendInParty == 1 and GetNumPartyMembers() > 0) then
+   -- Send the message to party or raid chat
+if (QuestProgressShareConfig.sendInParty == 1) then
+    if (GetNumRaidMembers() > 0) then
+        ChatThrottleLib:SendChatMessage("NORMAL", "QPS", message, "RAID")
+    elseif (GetNumPartyMembers() > 0) then
         ChatThrottleLib:SendChatMessage("NORMAL", "QPS", message, "PARTY")
     end
 end
