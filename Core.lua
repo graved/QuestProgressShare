@@ -831,6 +831,38 @@ local function HandleQuestLogUpdate()
     end
 end
 
+-- Quest-log events can arrive in large bursts on custom clients. Running a
+-- complete snapshot/diff directly from each event can keep the FrameScript
+-- dispatcher busy indefinitely. Coalesce the burst and perform the work from
+-- OnUpdate, with a bounded scan rate.
+QPS.questUpdateFrame = QPS.questUpdateFrame or CreateFrame("Frame")
+
+local function QueueQuestLogUpdate()
+    if not QPS._questLogUpdatePending then
+        QPS._questLogUpdateDue = GetTime() + 0.05
+    end
+    QPS._questLogUpdatePending = true
+end
+
+QPS.questUpdateFrame:SetScript("OnUpdate", function()
+    if not QPS._questLogUpdatePending or QPS._initialScanInProgress then
+        return
+    end
+
+    local now = GetTime()
+    if now < (QPS._questLogUpdateDue or 0) then
+        return
+    end
+    if QPS._questLogUpdateLast and now < QPS._questLogUpdateLast + 0.25 then
+        return
+    end
+
+    QPS._questLogUpdatePending = false
+    QPS._questLogUpdateDue = nil
+    HandleQuestLogUpdate()
+    QPS._questLogUpdateLast = GetTime()
+end)
+
 -- Main event handler for all registered events
 function OnEvent()
     -- Main event handler for all registered events: dispatches logic for quest log updates, login, entering world, and more
@@ -980,15 +1012,15 @@ function OnEvent()
     -- Quest item update: triggers quest log update logic for quest item changes
     elseif event == "QUEST_ITEM_UPDATE" then
         if QPS._initialScanInProgress then return end
-        LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] HandleQuestLogUpdate triggered by QUEST_ITEM_UPDATE")
-        HandleQuestLogUpdate()
+        LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] HandleQuestLogUpdate queued by QUEST_ITEM_UPDATE")
+        QueueQuestLogUpdate()
         return
 
     -- Quest log update: detects quest accept, completion, and progress
     elseif event == "QUEST_LOG_UPDATE" and QuestProgressShareConfig.enabled == 1 then
         if QPS._initialScanInProgress then return end
-        LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] HandleQuestLogUpdate triggered by QUEST_LOG_UPDATE")
-        HandleQuestLogUpdate()
+        LogDebugMessage(QPS_EventDebugLog, "[QPS-INFO] HandleQuestLogUpdate queued by QUEST_LOG_UPDATE")
+        QueueQuestLogUpdate()
 
     -- Player logout: saves progress and known quests
     elseif event == "PLAYER_LOGOUT" then
