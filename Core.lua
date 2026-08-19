@@ -26,7 +26,6 @@ QPS._suppressInitialProgress = false
 local QPSGet_QuestLogTitle = GetQuestLogTitle
 local QPSGet_NumQuestLogEntries = GetNumQuestLogEntries
 local QPSGet_QuestLogLeaderBoard = GetQuestLogLeaderBoard
-local QPSSelect_QuestLogEntry = SelectQuestLogEntry
 local QPSGet_QuestLogQuestText = GetQuestLogQuestText
 local QPSGet_NumQuestLeaderBoards = GetNumQuestLeaderBoards
 
@@ -117,23 +116,17 @@ local function DummyQuestProgressScan()
     for questIndex = 1, QPSGet_NumQuestLogEntries() do
         local title, _, _, isHeader, _, _, isComplete = QPSGet_QuestLogTitle(questIndex)
         if not isHeader and title and IsValidQuestLogIndex(questIndex) then
-            if pfDB then
-                local ids = SafeGetQuestIDs(questIndex, title)
-                local questID = ids and ids[1] and tonumber(ids[1])
-                if questID then
-                    QPSSelect_QuestLogEntry(questIndex)
-                end
-            else
-                QPSSelect_QuestLogEntry(questIndex)
-            end
-            local objectives = QPSGet_NumQuestLeaderBoards()
+            -- Query the target log slot directly. Selecting every quest from a
+            -- QUEST_LOG_UPDATE handler can emit more quest-log events on
+            -- custom clients, feeding the handler back into itself.
+            local objectives = QPSGet_NumQuestLeaderBoards(questIndex)
             -- If the quest has no objectives and is complete, mark as completed (for turn-in only quests)
             if objectives == 0 and isComplete then
                 local questKey = title .. "-COMPLETE"
                 lastProgress[questKey] = "Quest completed"
             end
             for i = 1, objectives do
-                local text = QPSGet_QuestLogLeaderBoard(i)
+                local text = QPSGet_QuestLogLeaderBoard(i, questIndex)
                 local questKey = title .. "-" .. i
                 lastProgress[questKey] = text
                 LogVerboseDebugMessage(QPS_CoreDebugLog, 'QPS DEBUG: DummyScan set ' .. questKey .. ' = ' .. tostring(text))
@@ -180,21 +173,10 @@ local function StartIncrementalInitialScan(onComplete)
 
             local title, level, _, isHeader, _, _, isComplete = QPSGet_QuestLogTitle(questIndex)
             if not isHeader and title and IsValidQuestLogIndex(questIndex) then
-                -- Keep objectives updated
-                if pfDB then
-                    local ids = SafeGetQuestIDs(questIndex, title)
-                    local questID = ids and ids[1] and tonumber(ids[1])
-                    if questID then
-                        QPSSelect_QuestLogEntry(questIndex)
-                    end
-                else
-                    QPSSelect_QuestLogEntry(questIndex)
-                end
-
                 local objectives = {}
-                local numObjectives = QPSGet_NumQuestLeaderBoards()
+                local numObjectives = QPSGet_NumQuestLeaderBoards(questIndex)
                 for i = 1, numObjectives do
-                    local text, _, finished = QPSGet_QuestLogLeaderBoard(i)
+                    local text, _, finished = QPSGet_QuestLogLeaderBoard(i, questIndex)
                     text = NormalizeObjectiveText(text)
                     objectives[i] = { text = text, finished = finished }
 
@@ -360,12 +342,10 @@ local function BuildQuestLogSnapshot()
     for questIndex = 1, numEntries do
         local title, level, _, isHeader, _, _, isComplete = QPSGet_QuestLogTitle(questIndex)
         if not isHeader and title then
-            -- Always select the quest to ensure objectives are up-to-date (matches Questie logic)
-            QPSSelect_QuestLogEntry(questIndex)
             local objectives = {}
-            local numObjectives = QPSGet_NumQuestLeaderBoards()
+            local numObjectives = QPSGet_NumQuestLeaderBoards(questIndex)
             for i = 1, numObjectives do
-                local text, objType, finished = QPSGet_QuestLogLeaderBoard(i)
+                local text, objType, finished = QPSGet_QuestLogLeaderBoard(i, questIndex)
                 LogDebugMessage(QPS_CoreDebugLog, '[QPS-DEBUG] BuildQuestLogSnapshot: i='..tostring(i)..', text='..tostring(text)..', objType='..tostring(objType)..', finished='..tostring(finished))
                 text = NormalizeObjectiveText(text)
                 objectives[i] = { text = text, finished = finished }
