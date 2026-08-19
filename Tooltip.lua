@@ -721,7 +721,6 @@ end
 if not QPS._partyProgressAddonListener then
     local AddonListener = CreateFrame("Frame")
     AddonListener:RegisterEvent("CHAT_MSG_ADDON")
-    AddonListener:RegisterEvent("QUEST_LOG_UPDATE")
     QPS.AddonListener = AddonListener
     AddonListener:SetScript("OnEvent", function()
         if event == "CHAT_MSG_ADDON" then
